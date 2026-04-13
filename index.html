@@ -5130,65 +5130,16 @@ async function _doSync(user, repo, token, direction, fromModal) {
     'Accept': 'application/vnd.github+json'
   };
 
-if (direction === 'push') {
-  const data = {
-    version: '4',
-    savedAt: new Date().toISOString(),
-    conversations: JSON.parse(localStorage.getItem('cs_convs') || '[]'),
-    projects:      JSON.parse(localStorage.getItem('cs_projects') || '[]'),
-    params:        JSON.parse(localStorage.getItem('cs_params') || '{}'),
-    context:       JSON.parse(localStorage.getItem('cs_context') || '{}')
-  };
-
-  const content = btoa(unescape(encodeURIComponent(JSON.stringify(data, null, 2))));
-
-  // Récupère le SHA actuel du fichier (null si le fichier n'existe pas encore)
-  async function getFileSha() {
-    const check = await fetch(API, { headers: HEADERS });
-    if (check.status === 404) return null; // Fichier inexistant = OK, pas besoin de SHA
-    if (!check.ok) {
-      const errData = await check.json().catch(() => ({}));
-      throw new Error(`Lecture GitHub échouée (${check.status}) : ${errData.message || 'erreur inconnue'}`);
-    }
-    const existing = await check.json();
-    return existing.sha;
-  }
-
-  // Envoie le fichier avec un SHA donné
-  async function doPut(sha) {
-    const body = { message: `Sync ${new Date().toLocaleString('fr-FR')}`, content };
-    if (sha) body.sha = sha;
-    return await fetch(API, {
-      method: 'PUT',
-      headers: HEADERS,
-      body: JSON.stringify(body)
-    });
-  }
-
-  try {
-    let sha = await getFileSha();
-    let resp = await doPut(sha);
-
-    // ← LE FIX CLÉ : si conflit de SHA (422), on re-fetch le SHA frais et on réessaie une fois
-    if (resp.status === 422) {
-      console.warn('SHA conflict, retrying with fresh SHA...');
-      sha = await getFileSha();
-      resp = await doPut(sha);
-    }
-
-    if (resp.ok) {
-      localStorage.setItem('cs_last_sync', new Date().toISOString());
-      document.getElementById('syncModal')?.remove();
-      showToast('✅ Sauvegardé sur GitHub avec succès !', 'success');
-    } else {
-      const err = await resp.json().catch(() => ({}));
-      throw new Error(err.message || `HTTP ${resp.status}`);
-    }
-  } catch (err) {
-    showToast(`❌ Erreur push: ${err.message}`, 'error');
-    console.error('Push error:', err);
-  }
-};
+  if (direction === 'push') {
+    // ── Rassembler les données (SANS les clés API)
+    const data = {
+      version: '4',
+      savedAt: new Date().toISOString(),
+      conversations: JSON.parse(localStorage.getItem('cs_convs') || '[]'),
+      projects:      JSON.parse(localStorage.getItem('cs_projects') || '[]'),
+      params:        JSON.parse(localStorage.getItem('cs_params') || '{}'),
+      context:       JSON.parse(localStorage.getItem('cs_context') || '{}')
+    };
 
     const jsonStr = JSON.stringify(data, null, 2);
     let content;
