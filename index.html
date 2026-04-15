@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Claude API Studio v2.1</title>
+<title>IA-Genius v2.1</title>
 <link rel="icon" type="image/svg+xml" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Cdefs%3E%3ClinearGradient id='g' x1='0%25' y1='0%25' x2='100%25' y2='100%25'%3E%3Cstop offset='0%25' stop-color='%23D97757'/%3E%3Cstop offset='100%25' stop-color='%23C4643A'/%3E%3C/linearGradient%3E%3C/defs%3E%3Crect width='64' height='64' rx='14' fill='url(%23g)'/%3E%3Cpath d='M32 12 C34 22, 42 30, 52 32 C42 34, 34 42, 32 52 C30 42, 22 34, 12 32 C22 30, 30 22, 32 12Z' fill='white' opacity='0.95'/%3E%3C/svg%3E">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link href="https://fonts.googleapis.com/css2?family=DM+Sans:ital,opsz,wght@0,9..40,300;0,9..40,400;0,9..40,500;0,9..40,600;0,9..40,700;1,9..40,400&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
@@ -1087,7 +1087,7 @@ textarea.param-input { min-height: 70px; resize: vertical; font-size: 12px; line
   <aside class="sidebar" id="sidebar">
     <div class="sidebar-h-resizer" id="sidebarHResizer"></div>
     <div class="sidebar-header">
-      <h2><span class="logo-dot"></span>Claude Studio</h2>
+      <h2><span class="logo-dot"></span>IA-Genius</h2>
       <button class="new-chat-btn" onclick="newConversation()">+ Nouveau</button>
     </div>
     <div class="sidebar-search">
@@ -1303,7 +1303,7 @@ textarea.param-input { min-height: 70px; resize: vertical; font-size: 12px; line
         <div class="chat-container" id="chatContainer">
           <div id="welcomeScreen" class="welcome-screen">
             <div class="welcome-logo">◇</div>
-            <h1>Claude API Studio</h1>
+            <h1>IA-Genius</h1>
           </div>
           <div class="chat-messages" id="chatMessages" style="display:none;"></div>
         </div>
@@ -1904,17 +1904,17 @@ document.addEventListener('DOMContentLoaded', () => {
   setTimeout(() => {
     const D = window.docx || window.Docx || window.DOCX;
     if (!D || !D.Paragraph) {
-      console.warn('[Claude Studio] docx library not loaded. Trying fallback...');
+      console.warn('[IA-Genius] docx library not loaded. Trying fallback...');
       const s = document.createElement('script');
       s.src = 'https://unpkg.com/docx@9.1.0/build/index.umd.js';
-      s.onload = () => console.log('[Claude Studio] docx loaded from unpkg ✓');
-      s.onerror = () => console.error('[Claude Studio] docx failed to load from all CDNs');
+      s.onload = () => console.log('[IA-Genius] docx loaded from unpkg ✓');
+      s.onerror = () => console.error('[IA-Genius] docx failed to load from all CDNs');
       document.head.appendChild(s);
     } else {
-      console.log('[Claude Studio] docx library ready ✓');
+      console.log('[IA-Genius] docx library ready ✓');
     }
     if (typeof saveAs === 'undefined' && typeof window.saveAs === 'undefined') {
-      console.warn('[Claude Studio] FileSaver not loaded. Loading fallback...');
+      console.warn('[IA-Genius] FileSaver not loaded. Loading fallback...');
       const s2 = document.createElement('script');
       s2.src = 'https://unpkg.com/file-saver@2.0.5/dist/FileSaver.min.js';
       document.head.appendChild(s2);
@@ -2563,12 +2563,12 @@ function renderDocPreview(container, art) {
   container.innerHTML = `<div class="doc-preview-container">
     <div class="doc-page">
       <div class="doc-page-header">
-        <div class="doc-page-header-left">◇ Claude API Studio</div>
+        <div class="doc-page-header-left">◇ IA-Genius</div>
         <div class="doc-page-header-right">${escapeHtml(model)}<br>${dateStr}</div>
       </div>
       ${html}
       <div class="doc-page-footer">
-        Généré par Claude API Studio — ${escapeHtml(dateStr)}
+        Généré par IA-Genius — ${escapeHtml(dateStr)}
       </div>
     </div>
   </div>`;
@@ -2833,13 +2833,13 @@ async function generateDocxBlob(markdownText, title, model) {
       },
       headers: { default: new D.Header({ children: [
         new D.Paragraph({ children: [
-          new D.TextRun({ text: '◇ Claude API Studio    ', font: 'Aptos', size: 18, color: '999999' }),
+          new D.TextRun({ text: '◇ IA-Genius    ', font: 'Aptos', size: 18, color: '999999' }),
           new D.TextRun({ text: dateStr, font: 'Aptos', size: 16, color: 'bbbbbb' }),
         ], alignment: D.AlignmentType?.RIGHT || 'right' })
       ] }) },
       footers: { default: new D.Footer({ children: [
         new D.Paragraph({ children: [
-          new D.TextRun({ text: 'Généré par Claude API Studio — ' + (model || ''), font: 'Aptos', size: 16, color: 'bbbbbb' }),
+          new D.TextRun({ text: 'Généré par IA-Genius — ' + (model || ''), font: 'Aptos', size: 16, color: 'bbbbbb' }),
         ], alignment: D.AlignmentType?.CENTER || 'center' })
       ] }) },
       children: [
@@ -3300,7 +3300,7 @@ function buildRequestBody(conv, params) {
 
   if (isDocxRequest) {
     const docxInstruction = `[INSTRUCTION PRIORITAIRE — GÉNÉRATION DE DOCUMENT]
-L'utilisateur est dans Claude API Studio qui génère AUTOMATIQUEMENT des fichiers Word (.docx) à partir de tes réponses Markdown.
+L'utilisateur est dans IA-Genius qui génère AUTOMATIQUEMENT des fichiers Word (.docx) à partir de tes réponses Markdown.
 
 RÈGLES STRICTES :
 1. Écris DIRECTEMENT le contenu du document en Markdown structuré (titres #/##/###, listes, tableaux, gras, code)
@@ -3741,7 +3741,7 @@ async function regularGeminiResponse(conv, apiKey, params) {
 // OPENROUTER ROUTING (compatible OpenAI, endpoint openrouter.ai)
 // ═══════════════════════════════════════════════════════════════
 function getOpenRouterHeaders(apiKey) {
-  return { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + apiKey, 'HTTP-Referer': window.location.href, 'X-Title': 'Claude API Studio' };
+  return { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + apiKey, 'HTTP-Referer': window.location.href, 'X-Title': 'IA-Genius' };
 }
 function buildOpenRouterRequestBody(conv, params) {
   // Reuse OpenAI body builder but override model with the real OpenRouter model ID
@@ -4774,12 +4774,12 @@ function openPrintPage(contentHtml, title, meta) {
       '<div class="doc-brand">' +
         '<div class="doc-logo">\u25C7</div>' +
         '<div class="doc-title-block"><h1>' + escapeHtml(title) + '</h1>' +
-        '<div class="doc-subtitle">G\u00e9n\u00e9r\u00e9 par Claude API Studio</div></div>' +
+        '<div class="doc-subtitle">G\u00e9n\u00e9r\u00e9 par IA-Genius</div></div>' +
       '</div>' +
       '<div class="doc-meta"><strong>' + escapeHtml(meta) + '</strong><br>' + dateStr + '</div>' +
     '</div>' +
     contentHtml +
-    '<div class="doc-footer"><span>Claude API Studio</span><span>' + dateStr + '</span></div>' +
+    '<div class="doc-footer"><span>IA-Genius</span><span>' + dateStr + '</span></div>' +
     '<script>window.onafterprint=function(){window.close()};' +
     'setTimeout(function(){window.print()},600);<\/script>' +
     '</body></html>');
@@ -4884,7 +4884,7 @@ function showToast(msg, type = '') {
 })();
 
 // ═══════════════════════════════════════════════════════════════
-// GITHUB SYNC — Claude Studio v4
+// GITHUB SYNC — IA-Genius v4
 // ═══════════════════════════════════════════════════════════════
 
 function openSyncModal() {
