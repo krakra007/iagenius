@@ -1176,12 +1176,12 @@ textarea.param-input { min-height: 70px; resize: vertical; font-size: 12px; line
               <option value="magistral-small-latest">Magistral Small (reasoning)</option>
               <option value="codestral-latest">Codestral (code)</option>
             </optgroup>
-            <optgroup label="── Gratuit ──">
+            <optgroup label="── Gratuit (Groq) ──">
               <option value="llama-3.3-70b-versatile">Llama 3.3 70B — Groq</option>
               <option value="llama-3.1-8b-instant">Llama 3.1 8B — Groq</option>
-              <option value="meta-llama/llama-4-scout-17b-16e-instruct">Llama 4 Scout 17B — Groq</option>
-              <option value="qwen/qwen3-32b">Qwen3 32B — Groq</option>
               <option value="openai/gpt-oss-120b">GPT-OSS 120B — Groq</option>
+              <option value="openai/gpt-oss-20b">GPT-OSS 20B — Groq</option>
+              <option value="meta-llama/llama-4-scout-17b-16e-instruct">Llama 4 Scout 17B — Groq (Preview)</option>
               <option value="open-mistral-nemo">Mistral Nemo 12B — Mistral</option>
             </optgroup>
             <optgroup label="── OpenRouter Gratuit ──">
@@ -3029,7 +3029,7 @@ function getModelShort(m) {
     'gemini-2.5-pro':'G2.5 Pro', 'gemini-2.5-flash':'G2.5 Flash', 'gemini-2.5-flash-lite':'G2.5 F-Lite',
     'llama-3.3-70b-versatile':'Llama3.3 70B', 'llama-3.1-8b-instant':'Llama3.1 8B',
     'meta-llama/llama-4-scout-17b-16e-instruct':'Llama4 Scout',
-    'qwen/qwen3-32b':'Qwen3 32B', 'openai/gpt-oss-120b':'GPT-OSS 120B',
+    'qwen/qwen3-32b':'Qwen3 32B', 'openai/gpt-oss-120b':'GPT-OSS 120B', 'openai/gpt-oss-20b':'GPT-OSS 20B',
     'mistral-large-latest':'M-Large', 'mistral-medium-latest':'M-Medium',
     'mistral-small-latest':'M-Small', 'magistral-medium-latest':'Mag-Med',
     'magistral-small-latest':'Mag-Small', 'codestral-latest':'Codestral',
@@ -3362,7 +3362,7 @@ RÈGLES STRICTES :
 const OPENAI_MODELS = new Set(['gpt-5.4','gpt-5.4-mini','gpt-5.4-nano','gpt-5','gpt-5-mini','gpt-5-nano','gpt-5.2','gpt-4.1','gpt-4.1-mini','gpt-4.1-nano','gpt-4o','gpt-4o-mini','o1','o3','o3-mini','o3-pro','o4-mini']);
 const DEEPSEEK_MODELS = new Set(['deepseek-chat','deepseek-reasoner']);
 const GEMINI_MODELS = new Set(['gemini-3.1-pro-preview','gemini-3-flash-preview','gemini-3.1-flash-lite-preview','gemini-2.5-pro','gemini-2.5-flash','gemini-2.5-flash-lite']);
-const GROQ_MODELS = new Set(['llama-3.3-70b-versatile','llama-3.1-8b-instant','meta-llama/llama-4-scout-17b-16e-instruct','qwen/qwen3-32b','openai/gpt-oss-120b']);
+const GROQ_MODELS = new Set(['llama-3.3-70b-versatile','llama-3.1-8b-instant','meta-llama/llama-4-scout-17b-16e-instruct','openai/gpt-oss-120b','openai/gpt-oss-20b']);
 const MISTRAL_MODELS = new Set(['mistral-large-latest','mistral-medium-latest','mistral-small-latest','magistral-medium-latest','magistral-small-latest','codestral-latest','open-mistral-nemo']);
 function isOpenAIModel(model) { return OPENAI_MODELS.has(model); }
 function isDeepSeekModel(model) { return DEEPSEEK_MODELS.has(model); }
