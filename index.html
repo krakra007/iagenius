@@ -3018,7 +3018,17 @@ function renderStopSequences() {
 // ═══════════════════════════════════════════════════════════════
 // CONVERSATIONS
 // ═══════════════════════════════════════════════════════════════
-function saveConversations() { localStorage.setItem('cs_convs', JSON.stringify(conversations)); }
+function saveConversations() {
+  try {
+    localStorage.setItem('cs_convs', JSON.stringify(conversations));
+  } catch (e) {
+    console.error('[saveConversations] localStorage full:', e);
+    // Show a toast, but don't block the flow
+    if (typeof showToast === 'function') {
+      showToast('⚠ Stockage local plein. Exportez/supprimez d\'anciennes conversations avec pièces jointes volumineuses.', 'error');
+    }
+  }
+}
 function newConversation() {
   activeProjectId = null;
   const conv = {
@@ -4044,6 +4054,17 @@ async function regularMistralResponse(conv, apiKey, params) {
 // SEND MESSAGE
 // ═══════════════════════════════════════════════════════════════
 async function sendMessage() {
+  try {
+    await _sendMessageCore();
+  } catch (err) {
+    console.error('[sendMessage] fatal error:', err);
+    showToast('⚠ Erreur : ' + (err.message || err), 'error');
+    isStreaming = false;
+    try { updateSendButton(); } catch {}
+  }
+}
+
+async function _sendMessageCore() {
   const input = document.getElementById('promptInput');
   const text = input.value.trim();
   if ((!text && pendingAttachments.length === 0) || isStreaming) return;
