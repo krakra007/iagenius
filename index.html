@@ -17,6 +17,15 @@
 <script src="https://cdnjs.cloudflare.com/ajax/libs/crypto-js/4.1.1/crypto-js.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/mammoth/1.6.0/mammoth.browser.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/4.0.379/pdf.min.mjs" type="module"></script>
+<script type="module">
+  try {
+    const pdfjs = await import('https://cdnjs.cloudflare.com/ajax/libs/pdf.js/4.0.379/pdf.min.mjs');
+    pdfjs.GlobalWorkerOptions.workerSrc = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/4.0.379/pdf.worker.min.mjs';
+    window.pdfjsLib = pdfjs;
+    console.log('[IAgeniusA] pdf.js ready ✓');
+  } catch (e) { console.error('[IAgeniusA] pdf.js failed to load:', e); }
+</script>
 <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/styles/github-dark.min.css">
 <style>
 :root {
@@ -1739,6 +1748,19 @@ async function readXlsxAsText(file) {
     return text.trim();
   } catch(e) { throw new Error('Impossible de lire le fichier Excel: ' + e.message); }
 }
+async function readPdfAsText(file) {
+  if (!window.pdfjsLib) throw new Error('Bibliothèque PDF non chargée');
+  var ab = await readFileAsArrayBuffer(file);
+  var pdf = await window.pdfjsLib.getDocument({ data: ab }).promise;
+  var allText = '';
+  for (var p = 1; p <= pdf.numPages; p++) {
+    var page = await pdf.getPage(p);
+    var content = await page.getTextContent();
+    var pageText = content.items.map(function(it) { return it.str; }).join(' ');
+    allText += '=== Page ' + p + ' ===\n' + pageText + '\n\n';
+  }
+  return allText.trim();
+}
 async function processFile(file) {
   if (file.size > 30 * 1024 * 1024) { showToast(file.name + ' trop volumineux (max 30 MB)', 'error'); return null; }
   const att = { name: file.name, size: file.size, type: file.type, mediaType: file.type,
@@ -1751,6 +1773,9 @@ async function processFile(file) {
   } else if (att.isPdf) {
     att.data = await readFileAsBase64(file);
     att.mediaType = 'application/pdf';
+    // Also extract text so non-Claude/Gemini providers can use it
+    try { att.textContent = await readPdfAsText(file); }
+    catch(e) { console.warn('PDF text extraction failed:', e); }
   } else if (att.isDocx) {
     try {
       att.textContent = await readDocxAsText(file);
@@ -3431,12 +3456,17 @@ function buildOpenAIRequestBody(conv, params) {
       for (const att of m.attachments) {
         if (att.isImage && att.data) {
           parts.push({ type: 'image_url', image_url: { url: 'data:' + att.mediaType + ';base64,' + att.data } });
+        } else if (att.isPdf && att.textContent) {
+          parts.push({ type: 'text', text: '[PDF: ' + att.name + ']\n```\n' + att.textContent + '\n```' });
         } else if (att.isText && att.textContent) {
           parts.push({ type: 'text', text: '[Fichier: ' + att.name + ']\n```\n' + att.textContent + '\n```' });
         }
       }
       if (m.content) parts.push({ type: 'text', text: m.content });
-      messages.push({ role: m.role, content: parts });
+      else if (m.role === 'user' && parts.length > 0) parts.push({ type: 'text', text: 'Analyse les fichiers ci-joints.' });
+      // Some providers (Groq, DeepSeek) don't accept content arrays with only text — flatten to string
+      const onlyText = parts.every(p => p.type === 'text');
+      messages.push({ role: m.role, content: onlyText ? parts.map(p => p.text).join('\n\n') : parts });
     } else {
       messages.push({ role: m.role, content: m.content });
     }
@@ -3547,13 +3577,18 @@ function buildDeepSeekRequestBody(conv, params) {
   if (fullSystem) messages.push({ role: 'system', content: fullSystem });
   conv.messages.filter(m => (m.role === 'user' || m.role === 'assistant') && (m.content || (m.attachments && m.attachments.length > 0))).forEach(m => {
     if (m.attachments && m.attachments.length > 0) {
+      const parts = [];
       for (const att of m.attachments) {
-        if (att.isText && att.textContent) {
+        if (att.isPdf && att.textContent) {
+          parts.push({ type: 'text', text: '[PDF: ' + att.name + ']\n```\n' + att.textContent + '\n```' });
+        } else if (att.isText && att.textContent) {
           parts.push({ type: 'text', text: '[Fichier: ' + att.name + ']\n```\n' + att.textContent + '\n```' });
         }
       }
       if (m.content) parts.push({ type: 'text', text: m.content });
-      messages.push({ role: m.role, content: parts.length === 1 ? parts[0].text : parts });
+      else if (m.role === 'user' && parts.length > 0) parts.push({ type: 'text', text: 'Analyse les fichiers ci-joints.' });
+      // DeepSeek doesn't support images; flatten text-only content
+      messages.push({ role: m.role, content: parts.map(p => p.text).join('\n\n') });
     } else {
       messages.push({ role: m.role, content: m.content });
     }
@@ -3654,12 +3689,16 @@ function buildGeminiRequestBody(conv, params) {
       for (const att of m.attachments) {
         if (att.isImage && att.data) {
           parts.push({ inline_data: { mime_type: att.mediaType, data: att.data } });
+        } else if (att.isPdf && att.data) {
+          // Gemini supports PDF via inline_data
+          parts.push({ inline_data: { mime_type: 'application/pdf', data: att.data } });
         } else if (att.isText && att.textContent) {
           parts.push({ text: '[Fichier: ' + att.name + ']\n```\n' + att.textContent + '\n```' });
         }
       }
     }
     if (m.content) parts.push({ text: m.content });
+    else if (m.role === 'user' && parts.length > 0) parts.push({ text: 'Analyse les fichiers ci-joints.' });
     contents.push({ role: m.role === 'assistant' ? 'model' : 'user', parts });
   });
   const body = { contents };
