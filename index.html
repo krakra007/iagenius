@@ -3503,6 +3503,10 @@ function buildOpenAIRequestBody(conv, params) {
       }
     } else if (params.model === 'o3-mini') {
       maxComp = Math.min(maxComp, 16384);
+    } else if (/^gpt-5/.test(params.model) || /^o[34]/.test(params.model)) {
+      // Reasoning models: internal thinking tokens consume the same budget as output.
+      // Force a minimum of 16000 to guarantee room for both reasoning and visible response.
+      maxComp = Math.max(maxComp, 16000);
     }
     body.max_completion_tokens = maxComp;
   } else { body.max_tokens = params.maxTokens; }
@@ -3529,12 +3533,12 @@ async function streamOpenAIResponse(conv, apiKey, params) {
   const chatMessages = document.getElementById('chatMessages');
   const msgDiv = document.createElement('div');
   msgDiv.className = 'message';
-  msgDiv.innerHTML = `<div class="message-header"><div class="message-avatar assistant">◇</div><span class="message-role">${params.model.startsWith('o') ? 'OpenAI' : 'OpenAI'}</span><span class="message-model">${getModelShort(params.model)}</span></div><div class="message-content" id="liveContent"><span class="streaming-cursor"></span></div>`;
+  msgDiv.innerHTML = `<div class="message-header"><div class="message-avatar assistant">◇</div><span class="message-role">OpenAI</span><span class="message-model">${getModelShort(params.model)}</span></div><div class="message-content" id="liveContent"><span class="streaming-cursor"></span></div>`;
   chatMessages.appendChild(msgDiv);
   const contentDiv = document.getElementById('liveContent');
   const reader = response.body.getReader();
   const decoder = new TextDecoder();
-  let buffer = '', assistantContent = '';
+  let buffer = '', assistantContent = '', finishReason = null;
   while (true) {
     const { done, value } = await reader.read();
     if (done) break;
@@ -3548,6 +3552,7 @@ async function streamOpenAIResponse(conv, apiKey, params) {
       try {
         const parsed = JSON.parse(data);
         const delta = normalizeContent(parsed.choices?.[0]?.delta?.content);
+        if (parsed.choices?.[0]?.finish_reason) finishReason = parsed.choices[0].finish_reason;
         if (delta) {
           assistantContent += delta;
           contentDiv.innerHTML = renderMarkdown(assistantContent) + '<span class="streaming-cursor"></span>';
@@ -3555,6 +3560,13 @@ async function streamOpenAIResponse(conv, apiKey, params) {
         }
       } catch {}
     }
+  }
+  // If empty response due to reasoning eating the budget, show helpful message
+  if (!assistantContent.trim() && finishReason === 'length') {
+    assistantContent = '⚠ **Réponse vide** — Le modèle ' + params.model + ' a épuisé son budget de tokens en raisonnement interne avant de produire une réponse visible.\n\nSolutions :\n- Augmentez `max_tokens` dans ⚙ Paramètres (essayez 32000+)\n- Simplifiez la demande\n- Utilisez un modèle non-reasoning comme `gpt-4o` ou `gpt-4.1`';
+    showToast('⚠ GPT-5 a épuisé son budget en reasoning. Augmentez max_tokens.', 'error');
+  } else if (!assistantContent.trim()) {
+    assistantContent = '⚠ Réponse vide reçue de l\'API (finish_reason: ' + (finishReason || 'inconnu') + ')';
   }
   conv.messages[conv.messages.length - 1].content = assistantContent;
   const cleanOAI = finalizeStreamContent(conv, assistantContent);
