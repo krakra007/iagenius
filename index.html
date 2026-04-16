@@ -1749,7 +1749,13 @@ async function readXlsxAsText(file) {
   } catch(e) { throw new Error('Impossible de lire le fichier Excel: ' + e.message); }
 }
 async function readPdfAsText(file) {
-  if (!window.pdfjsLib) throw new Error('Bibliothèque PDF non chargée');
+  // Wait up to 10 seconds for pdf.js to finish loading
+  let attempts = 0;
+  while (!window.pdfjsLib && attempts < 50) {
+    await new Promise(r => setTimeout(r, 200));
+    attempts++;
+  }
+  if (!window.pdfjsLib) throw new Error('Bibliothèque PDF non chargée après 10s — rechargez la page');
   var ab = await readFileAsArrayBuffer(file);
   var pdf = await window.pdfjsLib.getDocument({ data: ab }).promise;
   var allText = '';
@@ -1774,8 +1780,14 @@ async function processFile(file) {
     att.data = await readFileAsBase64(file);
     att.mediaType = 'application/pdf';
     // Also extract text so non-Claude/Gemini providers can use it
-    try { att.textContent = await readPdfAsText(file); }
-    catch(e) { console.warn('PDF text extraction failed:', e); }
+    try {
+      att.textContent = await readPdfAsText(file);
+      showToast('PDF importé : ' + att.name + ' (' + Math.round(att.textContent.length / 1000) + 'K car.)', 'success');
+    } catch(e) {
+      console.error('PDF text extraction failed:', e);
+      showToast('⚠ Extraction PDF échouée : ' + e.message + '. Le PDF ne fonctionnera qu\'avec Claude ou Gemini.', 'error');
+      att.textContent = null;
+    }
   } else if (att.isDocx) {
     try {
       att.textContent = await readDocxAsText(file);
@@ -3458,6 +3470,8 @@ function buildOpenAIRequestBody(conv, params) {
           parts.push({ type: 'image_url', image_url: { url: 'data:' + att.mediaType + ';base64,' + att.data } });
         } else if (att.isPdf && att.textContent) {
           parts.push({ type: 'text', text: '[PDF: ' + att.name + ']\n```\n' + att.textContent + '\n```' });
+        } else if (att.isPdf && !att.textContent) {
+          parts.push({ type: 'text', text: '[⚠ PDF "' + att.name + '" non lisible par ce modèle. Utilisez Claude ou Gemini pour traiter les PDF directement.]' });
         } else if (att.isText && att.textContent) {
           parts.push({ type: 'text', text: '[Fichier: ' + att.name + ']\n```\n' + att.textContent + '\n```' });
         }
@@ -3471,9 +3485,12 @@ function buildOpenAIRequestBody(conv, params) {
       messages.push({ role: m.role, content: m.content });
     }
   });
+  // GPT-5.x, o-series, and gpt-4.1 use max_completion_tokens. o-series and gpt-5.x don't support temperature.
   const isOSeries = /^o\d/.test(params.model);
+  const useMaxCompletion = isOSeries || /^gpt-5/.test(params.model) || /^gpt-4\.1/.test(params.model);
+  const noTemp = isOSeries || /^gpt-5/.test(params.model) || params.model.startsWith('magistral');
   const body = { model: params.model, messages };
-  if (isOSeries) {
+  if (useMaxCompletion) {
     // Estimate input tokens (~4 chars per token)
     var inputEstimate = JSON.stringify(messages).length / 4;
     var maxComp = params.maxTokens;
@@ -3489,10 +3506,8 @@ function buildOpenAIRequestBody(conv, params) {
     }
     body.max_completion_tokens = maxComp;
   } else { body.max_tokens = params.maxTokens; }
-  // o-series (OpenAI) and magistral-* (Mistral) don't support temperature
-  const noTemp = isOSeries || params.model.startsWith('magistral');
+  // o-series, gpt-5.x, and magistral don't support temperature or penalties
   if (!noTemp && !params.thinking) body.temperature = params.temperature;
-  // o-series and magistral don't support penalties either
   if (!noTemp && params.presencePenalty && params.presencePenalty !== 0) body.presence_penalty = params.presencePenalty;
   if (!noTemp && params.frequencyPenalty && params.frequencyPenalty !== 0) body.frequency_penalty = params.frequencyPenalty;
   return body;
