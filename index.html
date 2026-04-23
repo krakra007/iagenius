@@ -837,7 +837,7 @@ textarea.param-input { min-height: 70px; resize: vertical; font-size: 12px; line
 }
 
 /* ── Images ── */
-.message-content img { max-width: 100%; border-radius: var(--radius-sm); margin: 12px 0; }
+.message-content img { max-width: 100%; max-height: 512px; border-radius: var(--radius-sm); margin: 12px 0; cursor: pointer; object-fit: contain; }
 
 /* ── Definition lists / details ── */
 .message-content details { margin: 10px 0; padding: 10px 14px; background: var(--bg-tertiary); border-radius: var(--radius-sm); border: 1px solid var(--border); }
@@ -3017,10 +3017,24 @@ function renderStopSequences() {
 // ═══════════════════════════════════════════════════════════════
 function saveConversations() {
   try {
-    localStorage.setItem('cs_convs', JSON.stringify(conversations));
+    // Strip heavy binary data (generatedImages) before saving to localStorage
+    var toSave = conversations.map(function(c) {
+      var clone = Object.assign({}, c);
+      if (c.messages) {
+        clone.messages = c.messages.map(function(m) {
+          if (m.generatedImages) {
+            var mc = Object.assign({}, m);
+            delete mc.generatedImages;
+            return mc;
+          }
+          return m;
+        });
+      }
+      return clone;
+    });
+    localStorage.setItem('cs_convs', JSON.stringify(toSave));
   } catch (e) {
     console.error('[saveConversations] localStorage full:', e);
-    // Show a toast, but don't block the flow
     if (typeof showToast === 'function') {
       showToast('⚠ Stockage local plein. Exportez/supprimez d\'anciennes conversations avec pièces jointes volumineuses.', 'error');
     }
@@ -3712,12 +3726,24 @@ async function regularDeepSeekResponse(conv, apiKey, params) {
 // ═══════════════════════════════════════════════════════════════
 // GEMINI ROUTING
 // ═══════════════════════════════════════════════════════════════
+// Detect if user is asking for image generation
+function isImageRequest(text) {
+  if (!text) return false;
+  return /\b(g[eé]n[eè]re|cr[eé]e|dessine|illustre|fais|montre|fabrique|produis|generate|create|draw|make|show)\b.{0,30}\b(image|photo|illustration|dessin|picture|drawing|logo|icon[eê]?|affiche|poster|avatar|portrait|sc[eè]ne|paysage|visuel)\b/i.test(text)
+    || /\b(image|photo|illustration) (de|du|d'|des|of|about)\b/i.test(text);
+}
+
 function buildGeminiRequestBody(conv, params) {
   const contents = [];
   const ctxSystem = getContextSystemPrompt();
   let fullSystem = params.systemPrompt || '';
   if (ctxSystem) fullSystem = fullSystem ? fullSystem + '\n\n' + ctxSystem : ctxSystem;
   const systemInstruction = fullSystem ? { parts: [{ text: fullSystem }] } : null;
+
+  // Check if the last user message requests an image
+  const lastUserMsg = [...conv.messages].reverse().find(m => m.role === 'user');
+  const wantsImage = lastUserMsg && isImageRequest(lastUserMsg.content);
+
   conv.messages.filter(m => (m.role === 'user' || m.role === 'assistant') && (m.content || (m.attachments && m.attachments.length > 0))).forEach(m => {
     const parts = [];
     if (m.attachments && m.attachments.length > 0) {
@@ -3725,11 +3751,16 @@ function buildGeminiRequestBody(conv, params) {
         if (att.isImage && att.data) {
           parts.push({ inline_data: { mime_type: att.mediaType, data: att.data } });
         } else if (att.isPdf && att.data) {
-          // Gemini supports PDF via inline_data
           parts.push({ inline_data: { mime_type: 'application/pdf', data: att.data } });
         } else if (att.isText && att.textContent) {
           parts.push({ text: '[Fichier: ' + att.name + ']\n```\n' + att.textContent + '\n```' });
         }
+      }
+    }
+    // For assistant messages that contained generated images, re-inject them
+    if (m.generatedImages && m.generatedImages.length > 0) {
+      for (const img of m.generatedImages) {
+        parts.push({ inline_data: { mime_type: img.mimeType, data: img.data } });
       }
     }
     if (m.content) parts.push({ text: m.content });
@@ -3742,6 +3773,12 @@ function buildGeminiRequestBody(conv, params) {
   if (!params.thinking) body.generationConfig.temperature = params.temperature;
   if (params.presencePenalty && params.presencePenalty !== 0) body.generationConfig.presencePenalty = params.presencePenalty;
   if (params.frequencyPenalty && params.frequencyPenalty !== 0) body.generationConfig.frequencyPenalty = params.frequencyPenalty;
+
+  // Image generation: add responseModalities when user asks for images
+  if (wantsImage) {
+    body.generationConfig.responseModalities = ['TEXT', 'IMAGE'];
+  }
+
   // Google Search grounding
   if (params.webSearch) {
     body.tools = body.tools || [];
@@ -3752,6 +3789,11 @@ function buildGeminiRequestBody(conv, params) {
 
 async function streamGeminiResponse(conv, apiKey, params) {
   const body = buildGeminiRequestBody(conv, params);
+  // Image generation doesn't support streaming — fall back to regular
+  const lastUserMsg = [...conv.messages].reverse().find(m => m.role === 'user');
+  if (lastUserMsg && isImageRequest(lastUserMsg.content)) {
+    return await regularGeminiResponse(conv, apiKey, params);
+  }
   abortController = createAbort();
   const url = 'https://generativelanguage.googleapis.com/v1beta/models/' + params.model + ':streamGenerateContent?key=' + apiKey + '&alt=sse';
   const fetchOpts = { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) };
@@ -3772,6 +3814,7 @@ async function streamGeminiResponse(conv, apiKey, params) {
   const reader = response.body.getReader();
   const decoder = new TextDecoder();
   let buffer = '', assistantContent = '';
+  const collectedImages = [];
   while (true) {
     const { done, value } = await reader.read();
     if (done) break;
@@ -3784,16 +3827,26 @@ async function streamGeminiResponse(conv, apiKey, params) {
       if (!data) continue;
       try {
         const parsed = JSON.parse(data);
-        const text = parsed.candidates?.[0]?.content?.parts?.[0]?.text;
-        if (text) {
-          assistantContent += text;
-          contentDiv.innerHTML = renderMarkdown(assistantContent) + '<span class="streaming-cursor"></span>';
-          scrollToBottom();
+        const parts = parsed.candidates?.[0]?.content?.parts || [];
+        for (const part of parts) {
+          if (part.text) {
+            assistantContent += part.text;
+            contentDiv.innerHTML = renderMarkdown(assistantContent) + '<span class="streaming-cursor"></span>';
+            scrollToBottom();
+          }
+          if (part.inlineData || part.inline_data) {
+            const d = part.inlineData || part.inline_data;
+            collectedImages.push({ mimeType: d.mimeType || d.mime_type, data: d.data });
+            assistantContent += '\n\n![Image générée](data:' + (d.mimeType || d.mime_type) + ';base64,' + d.data + ')';
+            contentDiv.innerHTML = renderMarkdown(assistantContent) + '<span class="streaming-cursor"></span>';
+            scrollToBottom();
+          }
         }
       } catch {}
     }
   }
   conv.messages[conv.messages.length - 1].content = assistantContent;
+  if (collectedImages.length > 0) conv.messages[conv.messages.length - 1].generatedImages = collectedImages;
   contentDiv.innerHTML = renderMarkdown(assistantContent);
   hljs.highlightAll();
 }
@@ -3807,8 +3860,27 @@ async function regularGeminiResponse(conv, apiKey, params) {
     throw new Error((err.error?.message) || 'HTTP ' + response.status + ': ' + response.statusText);
   }
   const data = await response.json();
-  const content = data.candidates?.[0]?.content?.parts?.[0]?.text || '';
-  conv.messages.push({ role: 'assistant', content, model: params.model });
+  const parts = data.candidates?.[0]?.content?.parts || [];
+  let textContent = '';
+  const images = [];
+  for (const part of parts) {
+    if (part.text) textContent += part.text;
+    if (part.inlineData || part.inline_data) {
+      const d = part.inlineData || part.inline_data;
+      images.push({ mimeType: d.mimeType || d.mime_type, data: d.data });
+    }
+  }
+  // Build the image HTML to embed in the message content
+  let imageHtml = '';
+  if (images.length > 0) {
+    imageHtml = images.map(function(img, i) {
+      return '\n\n![Image générée ' + (i+1) + '](data:' + img.mimeType + ';base64,' + img.data + ')';
+    }).join('');
+  }
+  const msg = { role: 'assistant', content: textContent + imageHtml, model: params.model };
+  // Store images separately so they can be re-injected in future requests
+  if (images.length > 0) msg.generatedImages = images;
+  conv.messages.push(msg);
   removeTypingIndicator();
 }
 
