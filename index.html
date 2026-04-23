@@ -1174,6 +1174,7 @@ textarea.param-input { min-height: 70px; resize: vertical; font-size: 12px; line
               <option value="gemini-3.1-pro-preview">Gemini 3.1 Pro (Preview)</option>
               <option value="gemini-3-flash-preview">Gemini 3 Flash (Preview)</option>
               <option value="gemini-3.1-flash-lite-preview">Gemini 3.1 Flash-Lite (Preview)</option>
+              <option value="gemini-3.1-flash-image-preview">Gemini 3.1 Image 🎨 (Preview)</option>
             </optgroup>
             <optgroup label="── Google Gemini 2.5 ──">
               <option value="gemini-2.5-pro">Gemini 2.5 Pro</option>
@@ -3084,6 +3085,7 @@ function getModelShort(m) {
     'deepseek-chat':'DS-Chat', 'deepseek-reasoner':'DS-Reason',
     'gemini-3.1-pro-preview':'G3.1 Pro', 'gemini-3-flash-preview':'G3 Flash',
     'gemini-3.1-flash-lite-preview':'G3.1 F-Lite',
+    'gemini-3.1-flash-image-preview':'G3.1 Image',
     'gemini-2.5-pro':'G2.5 Pro', 'gemini-2.5-flash':'G2.5 Flash', 'gemini-2.5-flash-lite':'G2.5 F-Lite',
     'llama-3.3-70b-versatile':'Llama3.3 70B', 'llama-3.1-8b-instant':'Llama3.1 8B',
     'meta-llama/llama-4-scout-17b-16e-instruct':'Llama4 Scout',
@@ -3421,7 +3423,7 @@ RÈGLES STRICTES :
 // ═══════════════════════════════════════════════════════════════
 const OPENAI_MODELS = new Set(['gpt-5.4','gpt-5.4-mini','gpt-5.4-nano','gpt-5','gpt-5-mini','gpt-5-nano','gpt-5.2','gpt-4.1','gpt-4.1-mini','gpt-4.1-nano','gpt-4o','gpt-4o-mini','o1','o3','o3-mini','o3-pro','o4-mini']);
 const DEEPSEEK_MODELS = new Set(['deepseek-chat','deepseek-reasoner']);
-const GEMINI_MODELS = new Set(['gemini-3.1-pro-preview','gemini-3-flash-preview','gemini-3.1-flash-lite-preview','gemini-2.5-pro','gemini-2.5-flash','gemini-2.5-flash-lite']);
+const GEMINI_MODELS = new Set(['gemini-3.1-pro-preview','gemini-3-flash-preview','gemini-3.1-flash-lite-preview','gemini-3.1-flash-image-preview','gemini-2.5-pro','gemini-2.5-flash','gemini-2.5-flash-lite']);
 const GROQ_MODELS = new Set(['llama-3.3-70b-versatile','llama-3.1-8b-instant','meta-llama/llama-4-scout-17b-16e-instruct','openai/gpt-oss-120b','openai/gpt-oss-20b']);
 const MISTRAL_MODELS = new Set(['mistral-large-latest','mistral-medium-latest','mistral-small-latest','magistral-medium-latest','magistral-small-latest','codestral-latest','open-mistral-nemo']);
 function isOpenAIModel(model) { return OPENAI_MODELS.has(model); }
@@ -3740,9 +3742,10 @@ function buildGeminiRequestBody(conv, params) {
   if (ctxSystem) fullSystem = fullSystem ? fullSystem + '\n\n' + ctxSystem : ctxSystem;
   const systemInstruction = fullSystem ? { parts: [{ text: fullSystem }] } : null;
 
-  // Check if the last user message requests an image
+  // Check if the last user message requests an image OR if user selected image model directly
   const lastUserMsg = [...conv.messages].reverse().find(m => m.role === 'user');
-  const wantsImage = lastUserMsg && isImageRequest(lastUserMsg.content);
+  const isImageModel = params.model === 'gemini-3.1-flash-image-preview';
+  const wantsImage = isImageModel || (lastUserMsg && isImageRequest(lastUserMsg.content));
 
   conv.messages.filter(m => (m.role === 'user' || m.role === 'assistant') && (m.content || (m.attachments && m.attachments.length > 0))).forEach(m => {
     const parts = [];
@@ -3774,9 +3777,11 @@ function buildGeminiRequestBody(conv, params) {
   if (params.presencePenalty && params.presencePenalty !== 0) body.generationConfig.presencePenalty = params.presencePenalty;
   if (params.frequencyPenalty && params.frequencyPenalty !== 0) body.generationConfig.frequencyPenalty = params.frequencyPenalty;
 
-  // Image generation: add responseModalities when user asks for images
+  // Image generation: use dedicated image model
   if (wantsImage) {
     body.generationConfig.responseModalities = ['TEXT', 'IMAGE'];
+    // Override model — only image-specific models support responseModalities IMAGE
+    if (!isImageModel) body._useImageModel = true;
   }
 
   // Google Search grounding
@@ -3790,8 +3795,9 @@ function buildGeminiRequestBody(conv, params) {
 async function streamGeminiResponse(conv, apiKey, params) {
   const body = buildGeminiRequestBody(conv, params);
   // Image generation doesn't support streaming — fall back to regular
-  const lastUserMsg = [...conv.messages].reverse().find(m => m.role === 'user');
-  if (lastUserMsg && isImageRequest(lastUserMsg.content)) {
+  if (body._useImageModel) {
+    delete body._useImageModel;
+    showToast('🎨 Génération d\'image via Gemini Image...', 'success');
     return await regularGeminiResponse(conv, apiKey, params);
   }
   abortController = createAbort();
@@ -3853,7 +3859,10 @@ async function streamGeminiResponse(conv, apiKey, params) {
 
 async function regularGeminiResponse(conv, apiKey, params) {
   const body = buildGeminiRequestBody(conv, params);
-  const url = 'https://generativelanguage.googleapis.com/v1beta/models/' + params.model + ':generateContent?key=' + apiKey;
+  // Use dedicated image model if image generation was requested
+  const model = body._useImageModel ? 'gemini-3.1-flash-image-preview' : params.model;
+  delete body._useImageModel;
+  const url = 'https://generativelanguage.googleapis.com/v1beta/models/' + model + ':generateContent?key=' + apiKey;
   const response = await fetch(url, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) });
   if (!response.ok) {
     const err = await response.json().catch(() => ({}));
