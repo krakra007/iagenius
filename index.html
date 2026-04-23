@@ -3877,6 +3877,8 @@ async function regularGeminiResponse(conv, apiKey, params) {
   }
   const data = await response.json();
   const parts = data.candidates?.[0]?.content?.parts || [];
+  console.log('[Gemini] Response parts:', parts.length, 'types:', parts.map(p => p.text ? 'text(' + p.text.length + ')' : p.inlineData ? 'inlineData(' + p.inlineData.mimeType + ')' : p.inline_data ? 'inline_data(' + p.inline_data.mime_type + ')' : Object.keys(p).join(',')));
+  if (parts.length === 0) console.warn('[Gemini] No parts in response. Full response:', JSON.stringify(data).slice(0, 500));
   let textContent = '';
   const images = [];
   for (const part of parts) {
