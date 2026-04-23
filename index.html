@@ -1126,6 +1126,9 @@ textarea.param-input { min-height: 70px; resize: vertical; font-size: 12px; line
         <button class="toggle-sidebar-btn" onclick="toggleSidebar()" title="Menu">☰</button>
         <div class="model-selector">
           <select id="modelSelect" onchange="saveParams(); updateWebSearchAvailability()">
+            <optgroup label="── Claude 4.7 ──">
+              <option value="claude-opus-4-7">Opus 4.7 (nouveau)</option>
+            </optgroup>
             <optgroup label="── Claude 4.6 ──">
               <option value="claude-opus-4-6">Opus 4.6</option>
               <option value="claude-sonnet-4-6" selected>Sonnet 4.6</option>
@@ -1194,23 +1197,17 @@ textarea.param-input { min-height: 70px; resize: vertical; font-size: 12px; line
               <option value="open-mistral-nemo">Mistral Nemo 12B — Mistral</option>
             </optgroup>
             <optgroup label="── OpenRouter Gratuit ──">
-              <option value="or:qwen/qwen3.6-plus:free">Qwen 3.6 Plus (free)</option>
-              <option value="or:stepfun/step-3.5-flash:free">Step 3.5 Flash (free)</option>
               <option value="or:nvidia/nemotron-3-super-120b-a12b:free">Nemotron 3 Super 120B (free)</option>
-              <option value="or:qwen/qwen3-coder:free">Qwen3 Coder 480B (free)</option>
-              <option value="or:qwen/qwen3-next-80b-a3b-instruct:free">Qwen3 Next 80B (free)</option>
-              <option value="or:minimax/minimax-m2.5:free">MiniMax M2.5 (free)</option>
-              <option value="or:openai/gpt-oss-120b:free">GPT-OSS 120B (free)</option>
-              <option value="or:openai/gpt-oss-20b:free">GPT-OSS 20B (free)</option>
-              <option value="or:meta-llama/llama-3.3-70b-instruct:free">Llama 3.3 70B (free)</option>
-              <option value="or:nvidia/nemotron-3-nano-30b-a3b:free">Nemotron 3 Nano 30B (free)</option>
-              <option value="or:nvidia/nemotron-nano-9b-v2:free">Nemotron Nano 9B (free)</option>
-              <option value="or:z-ai/glm-4.5-air:free">GLM 4.5 Air (free)</option>
+              <option value="or:openrouter/elephant-alpha">Elephant Alpha 100B (free)</option>
               <option value="or:arcee-ai/trinity-large-preview:free">Trinity Large 400B (free)</option>
-              <option value="or:arcee-ai/trinity-mini:free">Trinity Mini 26B (free)</option>
+              <option value="or:z-ai/glm-4.5-air:free">GLM 4.5 Air (free)</option>
+              <option value="or:openai/gpt-oss-120b:free">GPT-OSS 120B (free)</option>
+              <option value="or:nvidia/nemotron-3-nano-30b-a3b:free">Nemotron 3 Nano 30B (free)</option>
+              <option value="or:minimax/minimax-m2.5:free">MiniMax M2.5 (free)</option>
               <option value="or:openrouter/free">Auto — gratuit aléatoire</option>
             </optgroup>
             <optgroup label="── OpenRouter Payant ──">
+              <option value="or:anthropic/claude-opus-4.7">Claude Opus 4.7 (OR)</option>
               <option value="or:anthropic/claude-sonnet-4.5">Claude Sonnet 4.5 (OR)</option>
               <option value="or:anthropic/claude-opus-4.6">Claude Opus 4.6 (OR)</option>
               <option value="or:openai/gpt-5.4">GPT-5.4 (OR)</option>
@@ -3062,7 +3059,7 @@ function deleteConversation(id, e) {
 function getCurrentConversation() { return conversations.find(c => c.id === currentConvId); }
 function getModelShort(m) {
   return {
-    'claude-opus-4-6':'Opus 4.6', 'claude-sonnet-4-6':'Son 4.6',
+    'claude-opus-4-7':'Opus 4.7', 'claude-opus-4-6':'Opus 4.6', 'claude-sonnet-4-6':'Son 4.6',
     'claude-sonnet-4-5-20250929':'Son 4.5', 'claude-haiku-4-5-20251001':'Haiku 4.5',
     'claude-opus-4-20250514':'Opus 4', 'claude-sonnet-4-20250514':'Son 4',
     'gpt-5.4':'GPT-5.4', 'gpt-5.4-mini':'5.4 mini', 'gpt-5.4-nano':'5.4 nano',
@@ -3081,15 +3078,16 @@ function getModelShort(m) {
     'mistral-small-latest':'M-Small', 'magistral-medium-latest':'Mag-Med',
     'magistral-small-latest':'Mag-Small', 'codestral-latest':'Codestral',
     'open-mistral-nemo':'M-Nemo',
-    'or:qwen/qwen3.6-plus:free':'Qwen3.6+ free', 'or:stepfun/step-3.5-flash:free':'Step3.5 free',
-    'or:nvidia/nemotron-3-super-120b-a12b:free':'Nemo3S free', 'or:qwen/qwen3-coder:free':'QwenCod free',
-    'or:qwen/qwen3-next-80b-a3b-instruct:free':'Qwen3N free', 'or:minimax/minimax-m2.5:free':'MiniMax free',
-    'or:openai/gpt-oss-120b:free':'GPT-OSS free', 'or:openai/gpt-oss-20b:free':'GPT-OS20 free',
-    'or:meta-llama/llama-3.3-70b-instruct:free':'Llama3.3 free',
-    'or:nvidia/nemotron-3-nano-30b-a3b:free':'NemoNano free', 'or:nvidia/nemotron-nano-9b-v2:free':'Nemo9B free',
+    'or:nvidia/nemotron-3-super-120b-a12b:free':'Nemo3S free',
+    'or:openrouter/elephant-alpha':'Elephant free',
+    'or:arcee-ai/trinity-large-preview:free':'Trinity free',
+    'or:z-ai/glm-4.5-air:free':'GLM4.5 free',
+    'or:openai/gpt-oss-120b:free':'GPT-OSS free',
+    'or:nvidia/nemotron-3-nano-30b-a3b:free':'NemoNano free',
+    'or:minimax/minimax-m2.5:free':'MiniMax free',
+    'or:openrouter/free':'OR Auto',
     'or:z-ai/glm-4.5-air:free':'GLM4.5 free', 'or:arcee-ai/trinity-large-preview:free':'Trinity free',
-    'or:arcee-ai/trinity-mini:free':'TriMini free', 'or:openrouter/free':'OR Auto',
-    'or:anthropic/claude-sonnet-4.5':'Son 4.5 OR', 'or:anthropic/claude-opus-4.6':'Opus 4.6 OR',
+    'or:anthropic/claude-opus-4.7':'Opus 4.7 OR', 'or:anthropic/claude-sonnet-4.5':'Son 4.5 OR', 'or:anthropic/claude-opus-4.6':'Opus 4.6 OR',
     'or:openai/gpt-5.4':'GPT-5.4 OR', 'or:google/gemini-2.5-pro-preview':'Gem2.5 OR',
     'or:deepseek/deepseek-r1':'DS R1 OR', 'or:x-ai/grok-3-mini':'Grok3m OR'
   }[m] || m.slice(0, 12);
