@@ -3731,8 +3731,13 @@ async function regularDeepSeekResponse(conv, apiKey, params) {
 // Detect if user is asking for image generation
 function isImageRequest(text) {
   if (!text) return false;
-  return /\b(g[eé]n[eè]re|cr[eé]e|dessine|illustre|fais|montre|fabrique|produis|generate|create|draw|make|show)\b.{0,30}\b(image|photo|illustration|dessin|picture|drawing|logo|icon[eê]?|affiche|poster|avatar|portrait|sc[eè]ne|paysage|visuel)\b/i.test(text)
-    || /\b(image|photo|illustration) (de|du|d'|des|of|about)\b/i.test(text);
+  // Direct visual verbs — always mean "generate an image"
+  if (/\b(dessine|dessiner|illustre|illustrer|draw|sketch)\b/i.test(text)) return true;
+  // Verb + image noun within 40 chars
+  if (/\b(g[eé]n[eè]re|cr[eé]e|fais|montre|fabrique|produis|generate|create|make|show)\b.{0,40}\b(image|photo|illustration|dessin|picture|drawing|logo|icon[eê]?|affiche|poster|avatar|portrait|sc[eè]ne|paysage|visuel|sch[eé]ma|diagramme|graphique|infographie)\b/i.test(text)) return true;
+  // Image noun + "de/du/of"
+  if (/\b(image|photo|illustration|dessin|picture|drawing) (de|du|d'|des|of|about)\b/i.test(text)) return true;
+  return false;
 }
 
 function buildGeminiRequestBody(conv, params) {
@@ -3861,7 +3866,9 @@ async function regularGeminiResponse(conv, apiKey, params) {
   const body = buildGeminiRequestBody(conv, params);
   // Use dedicated image model if image generation was requested
   const model = body._useImageModel ? 'gemini-3.1-flash-image-preview' : params.model;
+  const isImageGen = !!body._useImageModel || params.model === 'gemini-3.1-flash-image-preview';
   delete body._useImageModel;
+  if (isImageGen) console.log('[Gemini] Image generation mode → model:', model, 'responseModalities:', body.generationConfig?.responseModalities);
   const url = 'https://generativelanguage.googleapis.com/v1beta/models/' + model + ':generateContent?key=' + apiKey;
   const response = await fetch(url, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) });
   if (!response.ok) {
