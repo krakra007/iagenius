@@ -1168,9 +1168,13 @@ textarea.param-input { min-height: 70px; resize: vertical; font-size: 12px; line
               <option value="o3-mini">o3-mini</option>
               <option value="o1">o1</option>
             </optgroup>
-            <optgroup label="── DeepSeek ──">
-              <option value="deepseek-chat">DeepSeek-V3.2 (Chat)</option>
-              <option value="deepseek-reasoner">DeepSeek-V3.2 (Reasoner)</option>
+            <optgroup label="── DeepSeek V4 (Nouveau) ──">
+              <option value="deepseek-v4-pro">DeepSeek V4 Pro (1.6T params)</option>
+              <option value="deepseek-v4-flash">DeepSeek V4 Flash (rapide)</option>
+            </optgroup>
+            <optgroup label="── DeepSeek Legacy ──">
+              <option value="deepseek-chat">DeepSeek Chat (→V4 Flash, retiré juil.)</option>
+              <option value="deepseek-reasoner">DeepSeek Reasoner (→V4 Flash, retiré juil.)</option>
             </optgroup>
             <optgroup label="── Google Gemini 3 ──">
               <option value="gemini-3.1-pro-preview">Gemini 3.1 Pro (Preview)</option>
@@ -3085,6 +3089,7 @@ function getModelShort(m) {
     'gpt-4.1':'GPT-4.1', 'gpt-4.1-mini':'4.1 mini', 'gpt-4.1-nano':'4.1 nano',
     'gpt-4o':'GPT-4o', 'gpt-4o-mini':'4o-mini',
     'o1':'o1', 'o3':'o3', 'o3-mini':'o3-mini', 'o3-pro':'o3-pro', 'o4-mini':'o4-mini',
+    'deepseek-v4-pro':'DS V4 Pro', 'deepseek-v4-flash':'DS V4 Flash',
     'deepseek-chat':'DS-Chat', 'deepseek-reasoner':'DS-Reason',
     'gemini-3.1-pro-preview':'G3.1 Pro', 'gemini-3-flash-preview':'G3 Flash',
     'gemini-3.1-flash-lite-preview':'G3.1 F-Lite',
@@ -3426,7 +3431,7 @@ RÈGLES STRICTES :
 // OPENAI ROUTING
 // ═══════════════════════════════════════════════════════════════
 const OPENAI_MODELS = new Set(['gpt-5.4','gpt-5.4-mini','gpt-5.4-nano','gpt-5','gpt-5-mini','gpt-5-nano','gpt-5.2','gpt-4.1','gpt-4.1-mini','gpt-4.1-nano','gpt-4o','gpt-4o-mini','o1','o3','o3-mini','o3-pro','o4-mini']);
-const DEEPSEEK_MODELS = new Set(['deepseek-chat','deepseek-reasoner']);
+const DEEPSEEK_MODELS = new Set(['deepseek-v4-pro','deepseek-v4-flash','deepseek-chat','deepseek-reasoner']);
 const GEMINI_MODELS = new Set(['gemini-3.1-pro-preview','gemini-3-flash-preview','gemini-3.1-flash-lite-preview','gemini-3.1-flash-image-preview','gemini-2.5-pro','gemini-2.5-flash','gemini-2.5-flash-lite']);
 const GROQ_MODELS = new Set(['llama-3.3-70b-versatile','llama-3.1-8b-instant','meta-llama/llama-4-scout-17b-16e-instruct','openai/gpt-oss-120b','openai/gpt-oss-20b']);
 const MISTRAL_MODELS = new Set(['mistral-large-latest','mistral-medium-latest','mistral-small-latest','magistral-medium-latest','magistral-small-latest','codestral-latest','open-mistral-nemo']);
