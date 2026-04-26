@@ -1137,9 +1137,11 @@ textarea.param-input { min-height: 70px; resize: vertical; font-size: 12px; line
               <option value="claude-sonnet-4-5-20250929">Sonnet 4.5</option>
               <option value="claude-haiku-4-5-20251001">Haiku 4.5</option>
             </optgroup>
-            <optgroup label="── Claude 4 ──">
-              <option value="claude-opus-4-20250514">Opus 4</option>
-              <option value="claude-sonnet-4-20250514">Sonnet 4</option>
+            <optgroup label="── Claude 4 (Legacy) ──">
+              <option value="claude-opus-4-1">Opus 4.1</option>
+            </optgroup>
+            <optgroup label="── OpenAI GPT-5.5 ──">
+              <option value="gpt-5.5">GPT-5.5 (nouveau flagship)</option>
             </optgroup>
             <optgroup label="── OpenAI GPT-5.4 ──">
               <option value="gpt-5.4">GPT-5.4 (flagship)</option>
@@ -1199,12 +1201,13 @@ textarea.param-input { min-height: 70px; resize: vertical; font-size: 12px; line
             </optgroup>
             <optgroup label="── OpenRouter Gratuit ──">
               <option value="or:nvidia/nemotron-3-super-120b-a12b:free">Nemotron 3 Super 120B (free)</option>
-              <option value="or:openrouter/elephant-alpha">Elephant Alpha 100B (free)</option>
-              <option value="or:arcee-ai/trinity-large-preview:free">Trinity Large 400B (free)</option>
+              <option value="or:tencent/hy3-preview:free">Tencent Hy3 Preview (free)</option>
+              <option value="or:inclusionai/ling-2.6-1t:free">Ling 2.6 1T (free)</option>
+              <option value="or:inclusionai/ling-2.6-flash:free">Ling 2.6 Flash (free)</option>
               <option value="or:z-ai/glm-4.5-air:free">GLM 4.5 Air (free)</option>
+              <option value="or:minimax/minimax-m2.5:free">MiniMax M2.5 (free)</option>
               <option value="or:openai/gpt-oss-120b:free">GPT-OSS 120B (free)</option>
               <option value="or:nvidia/nemotron-3-nano-30b-a3b:free">Nemotron 3 Nano 30B (free)</option>
-              <option value="or:minimax/minimax-m2.5:free">MiniMax M2.5 (free)</option>
               <option value="or:openrouter/free">Auto — gratuit aléatoire</option>
             </optgroup>
             <optgroup label="── OpenRouter Payant ──">
@@ -3076,8 +3079,8 @@ function getModelShort(m) {
   return {
     'claude-opus-4-7':'Opus 4.7', 'claude-opus-4-6':'Opus 4.6', 'claude-sonnet-4-6':'Son 4.6',
     'claude-sonnet-4-5-20250929':'Son 4.5', 'claude-haiku-4-5-20251001':'Haiku 4.5',
-    'claude-opus-4-20250514':'Opus 4', 'claude-sonnet-4-20250514':'Son 4',
-    'gpt-5.4':'GPT-5.4', 'gpt-5.4-mini':'5.4 mini', 'gpt-5.4-nano':'5.4 nano',
+    'claude-opus-4-1':'Opus 4.1',
+    'gpt-5.5':'GPT-5.5', 'gpt-5.4':'GPT-5.4', 'gpt-5.4-mini':'5.4 mini', 'gpt-5.4-nano':'5.4 nano',
     'gpt-5':'GPT-5', 'gpt-5-mini':'5 mini', 'gpt-5-nano':'5 nano', 'gpt-5.2':'GPT-5.2',
     'gpt-4.1':'GPT-4.1', 'gpt-4.1-mini':'4.1 mini', 'gpt-4.1-nano':'4.1 nano',
     'gpt-4o':'GPT-4o', 'gpt-4o-mini':'4o-mini',
@@ -3095,14 +3098,15 @@ function getModelShort(m) {
     'magistral-small-latest':'Mag-Small', 'codestral-latest':'Codestral',
     'open-mistral-nemo':'M-Nemo',
     'or:nvidia/nemotron-3-super-120b-a12b:free':'Nemo3S free',
-    'or:openrouter/elephant-alpha':'Elephant free',
-    'or:arcee-ai/trinity-large-preview:free':'Trinity free',
+    'or:tencent/hy3-preview:free':'Hy3 free',
+    'or:inclusionai/ling-2.6-1t:free':'Ling1T free',
+    'or:inclusionai/ling-2.6-flash:free':'LingF free',
     'or:z-ai/glm-4.5-air:free':'GLM4.5 free',
     'or:openai/gpt-oss-120b:free':'GPT-OSS free',
     'or:nvidia/nemotron-3-nano-30b-a3b:free':'NemoNano free',
     'or:minimax/minimax-m2.5:free':'MiniMax free',
     'or:openrouter/free':'OR Auto',
-    'or:z-ai/glm-4.5-air:free':'GLM4.5 free', 'or:arcee-ai/trinity-large-preview:free':'Trinity free',
+    'or:z-ai/glm-4.5-air:free':'GLM4.5 free',
     'or:anthropic/claude-opus-4.7':'Opus 4.7 OR', 'or:anthropic/claude-sonnet-4.5':'Son 4.5 OR', 'or:anthropic/claude-opus-4.6':'Opus 4.6 OR',
     'or:openai/gpt-5.4':'GPT-5.4 OR', 'or:google/gemini-2.5-pro-preview':'Gem2.5 OR',
     'or:deepseek/deepseek-r1':'DS R1 OR', 'or:x-ai/grok-3-mini':'Grok3m OR'
@@ -3877,8 +3881,8 @@ async function regularGeminiResponse(conv, apiKey, params) {
   }
   const data = await response.json();
   const parts = data.candidates?.[0]?.content?.parts || [];
-  console.log('[Gemini] Response parts:', parts.length, 'types:', parts.map(p => p.text ? 'text(' + p.text.length + ')' : p.inlineData ? 'inlineData(' + p.inlineData.mimeType + ')' : p.inline_data ? 'inline_data(' + p.inline_data.mime_type + ')' : Object.keys(p).join(',')));
-  if (parts.length === 0) console.warn('[Gemini] No parts in response. Full response:', JSON.stringify(data).slice(0, 500));
+
+
   let textContent = '';
   const images = [];
   for (const part of parts) {
