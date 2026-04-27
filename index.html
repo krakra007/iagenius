@@ -255,6 +255,8 @@ body {
 .expert-none {
   font-size: 11px; color: var(--text-tertiary); padding: 4px 10px; font-style: italic;
 }
+.expert-active-folder { background: var(--accent-alpha); }
+.expert-active-folder .folder-name { color: var(--accent); font-weight: 600; }
 
 /* Modal */
 .proj-modal-overlay {
@@ -1139,10 +1141,9 @@ textarea.param-input { min-height: 70px; resize: vertical; font-size: 12px; line
       <span class="experts-title">🧠 Experts</span>
       <div class="projects-actions">
         <button class="proj-icon-btn" onclick="openExpertModal()" title="Nouvel expert">＋</button>
-        <button class="proj-icon-btn" onclick="deactivateExpert()" title="Désactiver l'expert actif" id="expertOffBtn" style="display:none">✕</button>
       </div>
     </div>
-    <div class="experts-list" id="expertsList"></div>
+    <div id="expertsFolders"></div>
 
     <!-- PROJECTS TOOLBAR -->
     <div class="projects-header">
@@ -4562,101 +4563,170 @@ function toggleSidebar() {
 // PROJECTS
 // ═══════════════════════════════════════════════════════════════
 // ═══════════════════════════════════════════════════════════════
-// EXPERTS (Gems) — Custom reusable system prompts
+// EXPERTS (Gems) — Custom reusable system prompts with conversations
 // ═══════════════════════════════════════════════════════════════
 let experts = [];
 let activeExpertId = null;
+let expandedExperts = new Set();
 const EXPERT_ICONS = ['🧠','🔬','💊','⚗️','📐','💻','✍️','🎨','📊','🌍','⚖️','🎓','🏗️','🧮','🔧','📚','🧪','💡','🤖','🎭'];
 
 function loadExperts() {
   try { experts = JSON.parse(localStorage.getItem('cs_experts') || '[]'); } catch(e) { experts = []; }
   activeExpertId = localStorage.getItem('cs_active_expert') || null;
+  try { var s = JSON.parse(localStorage.getItem('cs_expert_expanded') || '[]'); expandedExperts = new Set(s); } catch(e) { expandedExperts = new Set(); }
 }
 function saveExperts() {
   try { localStorage.setItem('cs_experts', JSON.stringify(experts)); } catch(e) {}
 }
+function saveExpandedExperts() { localStorage.setItem('cs_expert_expanded', JSON.stringify([...expandedExperts])); }
+
 function renderExperts() {
-  const el = document.getElementById('expertsList');
+  // Called from renderSidebar — renders expert folders into #expertsFolders
+  var el = document.getElementById('expertsFolders');
   if (!el) return;
   if (experts.length === 0) {
-    el.innerHTML = '<div class="expert-none">Aucun expert — cliquez ＋</div>';
-    document.getElementById('expertOffBtn').style.display = 'none';
+    el.innerHTML = '<div style="padding:4px 12px;font-size:11px;color:var(--text-tertiary);font-style:italic">Aucun expert — cliquez ＋</div>';
     return;
   }
-  document.getElementById('expertOffBtn').style.display = activeExpertId ? 'inline-block' : 'none';
-  el.innerHTML = experts.map(function(ex) {
-    var cls = ex.id === activeExpertId ? 'expert-item active' : 'expert-item';
-    return '<div class="' + cls + '" onclick="activateExpert(\'' + ex.id + '\')">'
-      + '<span class="expert-icon">' + (ex.icon || '🧠') + '</span>'
-      + '<span class="expert-name">' + escapeHtml(ex.name) + '</span>'
-      + '<span class="expert-actions">'
-      + '<button class="expert-action-btn" onclick="event.stopPropagation();openExpertModal(\'' + ex.id + '\')" title="Modifier">✎</button>'
-      + '<button class="expert-action-btn" onclick="event.stopPropagation();deleteExpert(\'' + ex.id + '\')" title="Supprimer">🗑</button>'
-      + '</span></div>';
-  }).join('');
+  var search = (document.getElementById('searchConv').value || '').toLowerCase();
+  var html = '';
+  experts.forEach(function(ex) {
+    var expConvs = conversations.filter(function(c) {
+      return c.expertId === ex.id && (!search || c.title.toLowerCase().includes(search));
+    });
+    var isOpen = expandedExperts.has(ex.id);
+    var isActive = ex.id === activeExpertId;
+    html += '<div class="folder-item' + (isOpen ? ' open' : '') + (isActive ? ' expert-active-folder' : '') + '" onclick="toggleExpertFolder(\'' + ex.id + '\')">'
+      + '<span class="folder-arrow">▶</span>'
+      + '<span style="font-size:15px;flex-shrink:0">' + (ex.icon || '🧠') + '</span>'
+      + '<span class="folder-name">' + escapeHtml(ex.name) + '</span>'
+      + '<span class="folder-count">' + expConvs.length + '</span>'
+      + '<div class="folder-actions">'
+      + '<button class="folder-action-btn add" onclick="event.stopPropagation();newConversationInExpert(\'' + ex.id + '\')" title="Nouvelle conversation">＋</button>'
+      + '<button class="folder-action-btn" onclick="event.stopPropagation();activateExpert(\'' + ex.id + '\')" title="' + (isActive ? 'Expert actif ✓' : 'Activer cet expert') + '">' + (isActive ? '⚡' : '▷') + '</button>'
+      + '<button class="folder-action-btn" onclick="event.stopPropagation();openExpertModal(\'' + ex.id + '\')" title="Modifier">✎</button>'
+      + '<button class="folder-action-btn" onclick="event.stopPropagation();deleteExpert(\'' + ex.id + '\')" title="Supprimer">✕</button>'
+      + '</div></div>';
+    if (isOpen) {
+      html += '<div class="folder-convs">';
+      if (expConvs.length === 0) {
+        html += '<div style="padding:6px 26px;font-size:12px;color:var(--text-tertiary)">Aucune conversation</div>';
+      } else {
+        expConvs.forEach(function(c) {
+          var cls = 'conv-item indented' + (c.id === currentConvId ? ' active' : '');
+          html += '<div class="' + cls + '" onclick="switchToConversation(\'' + c.id + '\')">'
+            + '<span class="conv-item-title" ondblclick="event.stopPropagation();startRenameConv(\'' + c.id + '\',this)">' + escapeHtml(c.title) + '</span>'
+            + '<div class="conv-item-meta">'
+            + '<span class="conv-model-badge">' + getModelShort(c.model) + '</span>'
+            + '<button class="conv-item-delete" onclick="event.stopPropagation();startRenameConvFromBtn(\'' + c.id + '\')" title="Renommer">✎</button>'
+            + '<button class="conv-item-delete" onclick="deleteConversation(\'' + c.id + '\', event)">✕</button>'
+            + '</div></div>';
+        });
+      }
+      html += '</div>';
+    }
+  });
+  el.innerHTML = html;
 }
+
+function toggleExpertFolder(id) {
+  if (expandedExperts.has(id)) expandedExperts.delete(id);
+  else expandedExperts.add(id);
+  saveExpandedExperts();
+  renderSidebar();
+}
+
 function activateExpert(id) {
   var ex = experts.find(function(e) { return e.id === id; });
   if (!ex) return;
+  // Toggle: if already active, deactivate
+  if (activeExpertId === id) { deactivateExpert(); return; }
   activeExpertId = id;
   localStorage.setItem('cs_active_expert', id);
-  // Apply expert's system prompt to the params panel
+  // Apply expert's system prompt
   var spEl = document.getElementById('systemPrompt');
   if (spEl) spEl.value = ex.systemPrompt || '';
-  // Apply preferred model if set
+  // Apply preferred model
   if (ex.model) {
     var sel = document.getElementById('modelSelect');
-    if (sel) {
-      for (var i = 0; i < sel.options.length; i++) {
-        if (sel.options[i].value === ex.model) { sel.selectedIndex = i; break; }
-      }
-    }
+    if (sel) { for (var i = 0; i < sel.options.length; i++) { if (sel.options[i].value === ex.model) { sel.selectedIndex = i; break; } } }
   }
-  // Apply preferred temperature if set
+  // Apply preferred temperature
   if (ex.temperature !== undefined && ex.temperature !== null) {
     var tempEl = document.getElementById('temperatureRange');
     var tempVal = document.getElementById('temperatureValue');
-    if (tempEl) { tempEl.value = ex.temperature; }
-    if (tempVal) { tempVal.textContent = ex.temperature; }
+    if (tempEl) tempEl.value = ex.temperature;
+    if (tempVal) tempVal.textContent = ex.temperature;
   }
   saveParams();
-  renderExperts();
+  renderSidebar();
   showToast(ex.icon + ' Expert "' + ex.name + '" activé', 'success');
 }
+
 function deactivateExpert() {
   activeExpertId = null;
   localStorage.removeItem('cs_active_expert');
   var spEl = document.getElementById('systemPrompt');
   if (spEl) spEl.value = '';
   saveParams();
-  renderExperts();
+  renderSidebar();
   showToast('Expert désactivé', 'success');
 }
-function deleteExpert(id) {
-  if (!confirm('Supprimer cet expert ?')) return;
-  experts = experts.filter(function(e) { return e.id !== id; });
-  if (activeExpertId === id) deactivateExpert();
-  saveExperts(); renderExperts();
+
+function newConversationInExpert(expertId) {
+  var ex = experts.find(function(e) { return e.id === expertId; });
+  expandedExperts.add(expertId);
+  saveExpandedExperts();
+  // Activate this expert automatically
+  activeExpertId = expertId;
+  localStorage.setItem('cs_active_expert', expertId);
+  if (ex) {
+    var spEl = document.getElementById('systemPrompt');
+    if (spEl) spEl.value = ex.systemPrompt || '';
+    if (ex.model) {
+      var sel = document.getElementById('modelSelect');
+      if (sel) { for (var i = 0; i < sel.options.length; i++) { if (sel.options[i].value === ex.model) { sel.selectedIndex = i; break; } } }
+    }
+    if (ex.temperature !== undefined && ex.temperature !== null) {
+      var tempEl = document.getElementById('temperatureRange');
+      var tempVal = document.getElementById('temperatureValue');
+      if (tempEl) tempEl.value = ex.temperature;
+      if (tempVal) tempVal.textContent = ex.temperature;
+    }
+  }
+  var conv = {
+    id: Date.now().toString(36) + Math.random().toString(36).slice(2, 6),
+    title: 'Nouvelle conversation', messages: [],
+    createdAt: new Date().toISOString(),
+    model: document.getElementById('modelSelect').value,
+    params: getParams(),
+    expertId: expertId
+  };
+  conversations.unshift(conv); saveConversations(); saveParams();
+  switchToConversation(conv.id); renderSidebar();
+  document.getElementById('promptInput').focus();
 }
+
+function deleteExpert(id) {
+  if (!confirm('Supprimer cet expert et détacher ses conversations ?')) return;
+  experts = experts.filter(function(e) { return e.id !== id; });
+  // Detach conversations — they become free conversations
+  conversations.forEach(function(c) { if (c.expertId === id) delete c.expertId; });
+  if (activeExpertId === id) { activeExpertId = null; localStorage.removeItem('cs_active_expert'); }
+  saveExperts(); saveConversations(); renderSidebar();
+  showToast('Expert supprimé', 'success');
+}
+
 function openExpertModal(editId) {
   var ex = editId ? experts.find(function(e) { return e.id === editId; }) : null;
   var isEdit = !!ex;
   var iconsHtml = EXPERT_ICONS.map(function(ic) {
-    var sel = (ex && ex.icon === ic) || (!ex && ic === '🧠') ? ' style="background:var(--accent);color:white;border-radius:6px;"' : '';
-    return '<span class="expert-icon-pick" onclick="pickExpertIcon(this,\'' + ic + '\')"' + sel + ' style="cursor:pointer;font-size:20px;padding:4px;' + (sel ? 'background:var(--accent);border-radius:6px;' : '') + '">' + ic + '</span>';
+    var isSel = (ex && ex.icon === ic) || (!ex && ic === '🧠');
+    return '<span class="expert-icon-pick" onclick="pickExpertIcon(this,\'' + ic + '\')" style="cursor:pointer;font-size:20px;padding:4px;' + (isSel ? 'background:var(--accent);border-radius:6px;' : '') + '">' + ic + '</span>';
   }).join(' ');
-
-  // Get all model options from the select
   var modelSel = document.getElementById('modelSelect');
   var modelOpts = '<option value="">— Modèle par défaut —</option>';
-  if (modelSel) {
-    for (var i = 0; i < modelSel.options.length; i++) {
-      var o = modelSel.options[i];
-      var s = (ex && ex.model === o.value) ? ' selected' : '';
-      modelOpts += '<option value="' + o.value + '"' + s + '>' + o.text + '</option>';
-    }
-  }
-
+  if (modelSel) { for (var i = 0; i < modelSel.options.length; i++) { var o = modelSel.options[i]; modelOpts += '<option value="' + o.value + '"' + (ex && ex.model === o.value ? ' selected' : '') + '>' + o.text + '</option>'; } }
   var html = '<div class="proj-modal-overlay" id="expertModalOverlay" onclick="if(event.target===this)closeExpertModal()">'
     + '<div class="proj-modal" style="max-width:440px">'
     + '<h3 style="margin:0 0 14px">' + (isEdit ? '✎ Modifier l\'expert' : '🧠 Nouvel expert') + '</h3>'
@@ -4664,9 +4734,9 @@ function openExpertModal(editId) {
     + '<div id="expertIconPicker" style="display:flex;flex-wrap:wrap;gap:4px">' + iconsHtml + '</div>'
     + '<input type="hidden" id="expertIconValue" value="' + (ex ? ex.icon : '🧠') + '"></div>'
     + '<div style="margin-bottom:10px"><label style="font-size:12px;font-weight:600;display:block;margin-bottom:4px">Nom</label>'
-    + '<input type="text" id="expertNameInput" value="' + (ex ? escapeHtml(ex.name) : '') + '" placeholder="Ex: Chimiste, Rédacteur, Codeur..." style="width:100%;padding:8px;border:1px solid var(--border);border-radius:6px;background:var(--bg-primary);color:var(--text-primary);font-size:14px;box-sizing:border-box"></div>'
+    + '<input type="text" id="expertNameInput" value="' + (ex ? escapeHtml(ex.name) : '') + '" placeholder="Ex: Chimiste, Rédacteur..." style="width:100%;padding:8px;border:1px solid var(--border);border-radius:6px;background:var(--bg-primary);color:var(--text-primary);font-size:14px;box-sizing:border-box"></div>'
     + '<div style="margin-bottom:10px"><label style="font-size:12px;font-weight:600;display:block;margin-bottom:4px">Prompt système</label>'
-    + '<textarea id="expertPromptInput" rows="6" placeholder="Décris le rôle et les instructions de cet expert..." style="width:100%;padding:8px;border:1px solid var(--border);border-radius:6px;background:var(--bg-primary);color:var(--text-primary);font-size:13px;resize:vertical;box-sizing:border-box;font-family:inherit">' + (ex ? escapeHtml(ex.systemPrompt || '') : '') + '</textarea></div>'
+    + '<textarea id="expertPromptInput" rows="6" placeholder="Décris le rôle et les instructions..." style="width:100%;padding:8px;border:1px solid var(--border);border-radius:6px;background:var(--bg-primary);color:var(--text-primary);font-size:13px;resize:vertical;box-sizing:border-box;font-family:inherit">' + (ex ? escapeHtml(ex.systemPrompt || '') : '') + '</textarea></div>'
     + '<div style="margin-bottom:10px"><label style="font-size:12px;font-weight:600;display:block;margin-bottom:4px">Modèle préféré (optionnel)</label>'
     + '<select id="expertModelSelect" style="width:100%;padding:8px;border:1px solid var(--border);border-radius:6px;background:var(--bg-primary);color:var(--text-primary);font-size:13px;box-sizing:border-box">' + modelOpts + '</select></div>'
     + '<div style="margin-bottom:14px"><label style="font-size:12px;font-weight:600;display:block;margin-bottom:4px">Température (optionnel)</label>'
@@ -4675,20 +4745,14 @@ function openExpertModal(editId) {
     + '<button onclick="closeExpertModal()" style="padding:8px 16px;border:1px solid var(--border);border-radius:6px;background:var(--bg-secondary);color:var(--text-primary);cursor:pointer">Annuler</button>'
     + '<button onclick="saveExpertFromModal(\'' + (editId || '') + '\')" style="padding:8px 16px;border:none;border-radius:6px;background:var(--accent);color:white;cursor:pointer;font-weight:600">' + (isEdit ? 'Enregistrer' : 'Créer') + '</button>'
     + '</div></div></div>';
-
   document.body.insertAdjacentHTML('beforeend', html);
   document.getElementById('expertNameInput').focus();
 }
-function closeExpertModal() {
-  var ov = document.getElementById('expertModalOverlay');
-  if (ov) ov.remove();
-}
+function closeExpertModal() { var ov = document.getElementById('expertModalOverlay'); if (ov) ov.remove(); }
 function pickExpertIcon(el, icon) {
   document.getElementById('expertIconValue').value = icon;
-  var picks = document.querySelectorAll('#expertIconPicker .expert-icon-pick');
-  picks.forEach(function(p) { p.style.background = ''; p.style.borderRadius = ''; });
-  el.style.background = 'var(--accent)';
-  el.style.borderRadius = '6px';
+  document.querySelectorAll('#expertIconPicker .expert-icon-pick').forEach(function(p) { p.style.background = ''; p.style.borderRadius = ''; });
+  el.style.background = 'var(--accent)'; el.style.borderRadius = '6px';
 }
 function saveExpertFromModal(editId) {
   var name = document.getElementById('expertNameInput').value.trim();
@@ -4697,24 +4761,15 @@ function saveExpertFromModal(editId) {
   var model = document.getElementById('expertModelSelect').value;
   var tempStr = document.getElementById('expertTempInput').value;
   var temp = tempStr !== '' ? parseFloat(tempStr) : null;
-
   if (!name) { showToast('Entrez un nom pour l\'expert', 'error'); return; }
   if (!prompt) { showToast('Entrez un prompt système', 'error'); return; }
-
   if (editId) {
     var ex = experts.find(function(e) { return e.id === editId; });
-    if (ex) {
-      ex.name = name; ex.systemPrompt = prompt; ex.icon = icon;
-      ex.model = model || null; ex.temperature = temp;
-    }
+    if (ex) { ex.name = name; ex.systemPrompt = prompt; ex.icon = icon; ex.model = model || null; ex.temperature = temp; }
   } else {
-    experts.push({
-      id: Date.now().toString(36) + Math.random().toString(36).slice(2, 5),
-      name: name, systemPrompt: prompt, icon: icon,
-      model: model || null, temperature: temp
-    });
+    experts.push({ id: Date.now().toString(36) + Math.random().toString(36).slice(2, 5), name: name, systemPrompt: prompt, icon: icon, model: model || null, temperature: temp });
   }
-  saveExperts(); renderExperts(); closeExpertModal();
+  saveExperts(); renderSidebar(); closeExpertModal();
   showToast(icon + ' Expert "' + name + '" ' + (editId ? 'modifié' : 'créé'), 'success');
 }
 
@@ -4767,6 +4822,9 @@ function renderSidebar() {
 
   let html = '';
 
+  // ── Render expert folders ──
+  renderExperts();
+
   // ── Folders (projects) ──
   projects.forEach(p => {
     const projConvs = conversations.filter(c => c.projectId === p.id &&
@@ -4795,7 +4853,7 @@ function renderSidebar() {
   });
 
   // ── Separator + free conversations ──
-  const freeConvs = conversations.filter(c => !c.projectId &&
+  const freeConvs = conversations.filter(c => !c.projectId && !c.expertId &&
     (!search || c.title.toLowerCase().includes(search) || c.messages.some(m => (m.content||'').toLowerCase().includes(search))));
 
   if (projects.length > 0) {
