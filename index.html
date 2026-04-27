@@ -226,6 +226,36 @@ body {
 }
 .proj-icon-btn:hover { background: var(--bg-hover); color: var(--text-primary); }
 
+/* Experts (Gems) */
+.experts-header {
+  display: flex; align-items: center; justify-content: space-between;
+  padding: 6px 8px 4px; border-bottom: 1px solid var(--border); flex-shrink: 0;
+}
+.experts-title {
+  font-size: 12px; font-weight: 700; text-transform: uppercase;
+  letter-spacing: 0.05em; color: var(--text-tertiary); flex: 1;
+}
+.experts-list { padding: 4px 8px; max-height: 160px; overflow-y: auto; flex-shrink: 0; }
+.expert-item {
+  display: flex; align-items: center; gap: 8px; padding: 6px 10px;
+  border-radius: var(--radius-sm); cursor: pointer; transition: background 0.15s;
+  font-size: 13px; color: var(--text-secondary); position: relative;
+}
+.expert-item:hover { background: var(--bg-hover); }
+.expert-item.active { background: var(--accent-alpha); color: var(--accent); font-weight: 600; }
+.expert-item .expert-icon { font-size: 16px; flex-shrink: 0; }
+.expert-item .expert-name { flex: 1; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.expert-item .expert-actions { display: none; gap: 2px; }
+.expert-item:hover .expert-actions { display: flex; }
+.expert-action-btn {
+  background: none; border: none; color: var(--text-tertiary); cursor: pointer;
+  font-size: 12px; padding: 1px 4px; border-radius: 3px; line-height: 1;
+}
+.expert-action-btn:hover { background: var(--bg-tertiary); color: var(--text-primary); }
+.expert-none {
+  font-size: 11px; color: var(--text-tertiary); padding: 4px 10px; font-style: italic;
+}
+
 /* Modal */
 .proj-modal-overlay {
   position: fixed; inset: 0; background: rgba(0,0,0,0.5);
@@ -1104,6 +1134,16 @@ textarea.param-input { min-height: 70px; resize: vertical; font-size: 12px; line
       <input type="text" placeholder="Rechercher..." id="searchConv" oninput="filterConversations()">
     </div>
 
+    <!-- EXPERTS -->
+    <div class="experts-header">
+      <span class="experts-title">🧠 Experts</span>
+      <div class="projects-actions">
+        <button class="proj-icon-btn" onclick="openExpertModal()" title="Nouvel expert">＋</button>
+        <button class="proj-icon-btn" onclick="deactivateExpert()" title="Désactiver l'expert actif" id="expertOffBtn" style="display:none">✕</button>
+      </div>
+    </div>
+    <div class="experts-list" id="expertsList"></div>
+
     <!-- PROJECTS TOOLBAR -->
     <div class="projects-header">
       <span class="projects-title">📁 Projets</span>
@@ -1940,7 +1980,7 @@ const PRESETS = {
 // INIT
 // ═══════════════════════════════════════════════════════════════
 document.addEventListener('DOMContentLoaded', () => {
-  loadApiKey(); loadOpenAIApiKey(); loadDeepSeekApiKey(); loadGeminiApiKey(); loadGroqApiKey(); loadMistralApiKey(); loadOpenRouterApiKey(); loadParams(); loadContext(); loadProjects(); renderSidebar(); updateKeysBadge();
+  loadApiKey(); loadOpenAIApiKey(); loadDeepSeekApiKey(); loadGeminiApiKey(); loadGroqApiKey(); loadMistralApiKey(); loadOpenRouterApiKey(); loadParams(); loadContext(); loadExperts(); loadProjects(); renderSidebar(); renderExperts(); updateKeysBadge();
   setTimeout(function() { if (typeof updateWebSearchAvailability === 'function') updateWebSearchAvailability(); }, 100);
   // Verify docx library loaded
   setTimeout(() => {
@@ -4520,6 +4560,164 @@ function toggleSidebar() {
 
 // ═══════════════════════════════════════════════════════════════
 // PROJECTS
+// ═══════════════════════════════════════════════════════════════
+// ═══════════════════════════════════════════════════════════════
+// EXPERTS (Gems) — Custom reusable system prompts
+// ═══════════════════════════════════════════════════════════════
+let experts = [];
+let activeExpertId = null;
+const EXPERT_ICONS = ['🧠','🔬','💊','⚗️','📐','💻','✍️','🎨','📊','🌍','⚖️','🎓','🏗️','🧮','🔧','📚','🧪','💡','🤖','🎭'];
+
+function loadExperts() {
+  try { experts = JSON.parse(localStorage.getItem('cs_experts') || '[]'); } catch(e) { experts = []; }
+  activeExpertId = localStorage.getItem('cs_active_expert') || null;
+}
+function saveExperts() {
+  try { localStorage.setItem('cs_experts', JSON.stringify(experts)); } catch(e) {}
+}
+function renderExperts() {
+  const el = document.getElementById('expertsList');
+  if (!el) return;
+  if (experts.length === 0) {
+    el.innerHTML = '<div class="expert-none">Aucun expert — cliquez ＋</div>';
+    document.getElementById('expertOffBtn').style.display = 'none';
+    return;
+  }
+  document.getElementById('expertOffBtn').style.display = activeExpertId ? 'inline-block' : 'none';
+  el.innerHTML = experts.map(function(ex) {
+    var cls = ex.id === activeExpertId ? 'expert-item active' : 'expert-item';
+    return '<div class="' + cls + '" onclick="activateExpert(\'' + ex.id + '\')">'
+      + '<span class="expert-icon">' + (ex.icon || '🧠') + '</span>'
+      + '<span class="expert-name">' + escapeHtml(ex.name) + '</span>'
+      + '<span class="expert-actions">'
+      + '<button class="expert-action-btn" onclick="event.stopPropagation();openExpertModal(\'' + ex.id + '\')" title="Modifier">✎</button>'
+      + '<button class="expert-action-btn" onclick="event.stopPropagation();deleteExpert(\'' + ex.id + '\')" title="Supprimer">🗑</button>'
+      + '</span></div>';
+  }).join('');
+}
+function activateExpert(id) {
+  var ex = experts.find(function(e) { return e.id === id; });
+  if (!ex) return;
+  activeExpertId = id;
+  localStorage.setItem('cs_active_expert', id);
+  // Apply expert's system prompt to the params panel
+  var spEl = document.getElementById('systemPrompt');
+  if (spEl) spEl.value = ex.systemPrompt || '';
+  // Apply preferred model if set
+  if (ex.model) {
+    var sel = document.getElementById('modelSelect');
+    if (sel) {
+      for (var i = 0; i < sel.options.length; i++) {
+        if (sel.options[i].value === ex.model) { sel.selectedIndex = i; break; }
+      }
+    }
+  }
+  // Apply preferred temperature if set
+  if (ex.temperature !== undefined && ex.temperature !== null) {
+    var tempEl = document.getElementById('temperatureRange');
+    var tempVal = document.getElementById('temperatureValue');
+    if (tempEl) { tempEl.value = ex.temperature; }
+    if (tempVal) { tempVal.textContent = ex.temperature; }
+  }
+  saveParams();
+  renderExperts();
+  showToast(ex.icon + ' Expert "' + ex.name + '" activé', 'success');
+}
+function deactivateExpert() {
+  activeExpertId = null;
+  localStorage.removeItem('cs_active_expert');
+  var spEl = document.getElementById('systemPrompt');
+  if (spEl) spEl.value = '';
+  saveParams();
+  renderExperts();
+  showToast('Expert désactivé', 'success');
+}
+function deleteExpert(id) {
+  if (!confirm('Supprimer cet expert ?')) return;
+  experts = experts.filter(function(e) { return e.id !== id; });
+  if (activeExpertId === id) deactivateExpert();
+  saveExperts(); renderExperts();
+}
+function openExpertModal(editId) {
+  var ex = editId ? experts.find(function(e) { return e.id === editId; }) : null;
+  var isEdit = !!ex;
+  var iconsHtml = EXPERT_ICONS.map(function(ic) {
+    var sel = (ex && ex.icon === ic) || (!ex && ic === '🧠') ? ' style="background:var(--accent);color:white;border-radius:6px;"' : '';
+    return '<span class="expert-icon-pick" onclick="pickExpertIcon(this,\'' + ic + '\')"' + sel + ' style="cursor:pointer;font-size:20px;padding:4px;' + (sel ? 'background:var(--accent);border-radius:6px;' : '') + '">' + ic + '</span>';
+  }).join(' ');
+
+  // Get all model options from the select
+  var modelSel = document.getElementById('modelSelect');
+  var modelOpts = '<option value="">— Modèle par défaut —</option>';
+  if (modelSel) {
+    for (var i = 0; i < modelSel.options.length; i++) {
+      var o = modelSel.options[i];
+      var s = (ex && ex.model === o.value) ? ' selected' : '';
+      modelOpts += '<option value="' + o.value + '"' + s + '>' + o.text + '</option>';
+    }
+  }
+
+  var html = '<div class="proj-modal-overlay" id="expertModalOverlay" onclick="if(event.target===this)closeExpertModal()">'
+    + '<div class="proj-modal" style="max-width:440px">'
+    + '<h3 style="margin:0 0 14px">' + (isEdit ? '✎ Modifier l\'expert' : '🧠 Nouvel expert') + '</h3>'
+    + '<div style="margin-bottom:10px"><label style="font-size:12px;font-weight:600;display:block;margin-bottom:4px">Icône</label>'
+    + '<div id="expertIconPicker" style="display:flex;flex-wrap:wrap;gap:4px">' + iconsHtml + '</div>'
+    + '<input type="hidden" id="expertIconValue" value="' + (ex ? ex.icon : '🧠') + '"></div>'
+    + '<div style="margin-bottom:10px"><label style="font-size:12px;font-weight:600;display:block;margin-bottom:4px">Nom</label>'
+    + '<input type="text" id="expertNameInput" value="' + (ex ? escapeHtml(ex.name) : '') + '" placeholder="Ex: Chimiste, Rédacteur, Codeur..." style="width:100%;padding:8px;border:1px solid var(--border);border-radius:6px;background:var(--bg-primary);color:var(--text-primary);font-size:14px;box-sizing:border-box"></div>'
+    + '<div style="margin-bottom:10px"><label style="font-size:12px;font-weight:600;display:block;margin-bottom:4px">Prompt système</label>'
+    + '<textarea id="expertPromptInput" rows="6" placeholder="Décris le rôle et les instructions de cet expert..." style="width:100%;padding:8px;border:1px solid var(--border);border-radius:6px;background:var(--bg-primary);color:var(--text-primary);font-size:13px;resize:vertical;box-sizing:border-box;font-family:inherit">' + (ex ? escapeHtml(ex.systemPrompt || '') : '') + '</textarea></div>'
+    + '<div style="margin-bottom:10px"><label style="font-size:12px;font-weight:600;display:block;margin-bottom:4px">Modèle préféré (optionnel)</label>'
+    + '<select id="expertModelSelect" style="width:100%;padding:8px;border:1px solid var(--border);border-radius:6px;background:var(--bg-primary);color:var(--text-primary);font-size:13px;box-sizing:border-box">' + modelOpts + '</select></div>'
+    + '<div style="margin-bottom:14px"><label style="font-size:12px;font-weight:600;display:block;margin-bottom:4px">Température (optionnel)</label>'
+    + '<input type="number" id="expertTempInput" min="0" max="2" step="0.1" value="' + (ex && ex.temperature != null ? ex.temperature : '') + '" placeholder="Laisser vide = défaut" style="width:100px;padding:6px 8px;border:1px solid var(--border);border-radius:6px;background:var(--bg-primary);color:var(--text-primary);font-size:13px"></div>'
+    + '<div style="display:flex;gap:8px;justify-content:flex-end">'
+    + '<button onclick="closeExpertModal()" style="padding:8px 16px;border:1px solid var(--border);border-radius:6px;background:var(--bg-secondary);color:var(--text-primary);cursor:pointer">Annuler</button>'
+    + '<button onclick="saveExpertFromModal(\'' + (editId || '') + '\')" style="padding:8px 16px;border:none;border-radius:6px;background:var(--accent);color:white;cursor:pointer;font-weight:600">' + (isEdit ? 'Enregistrer' : 'Créer') + '</button>'
+    + '</div></div></div>';
+
+  document.body.insertAdjacentHTML('beforeend', html);
+  document.getElementById('expertNameInput').focus();
+}
+function closeExpertModal() {
+  var ov = document.getElementById('expertModalOverlay');
+  if (ov) ov.remove();
+}
+function pickExpertIcon(el, icon) {
+  document.getElementById('expertIconValue').value = icon;
+  var picks = document.querySelectorAll('#expertIconPicker .expert-icon-pick');
+  picks.forEach(function(p) { p.style.background = ''; p.style.borderRadius = ''; });
+  el.style.background = 'var(--accent)';
+  el.style.borderRadius = '6px';
+}
+function saveExpertFromModal(editId) {
+  var name = document.getElementById('expertNameInput').value.trim();
+  var prompt = document.getElementById('expertPromptInput').value.trim();
+  var icon = document.getElementById('expertIconValue').value;
+  var model = document.getElementById('expertModelSelect').value;
+  var tempStr = document.getElementById('expertTempInput').value;
+  var temp = tempStr !== '' ? parseFloat(tempStr) : null;
+
+  if (!name) { showToast('Entrez un nom pour l\'expert', 'error'); return; }
+  if (!prompt) { showToast('Entrez un prompt système', 'error'); return; }
+
+  if (editId) {
+    var ex = experts.find(function(e) { return e.id === editId; });
+    if (ex) {
+      ex.name = name; ex.systemPrompt = prompt; ex.icon = icon;
+      ex.model = model || null; ex.temperature = temp;
+    }
+  } else {
+    experts.push({
+      id: Date.now().toString(36) + Math.random().toString(36).slice(2, 5),
+      name: name, systemPrompt: prompt, icon: icon,
+      model: model || null, temperature: temp
+    });
+  }
+  saveExperts(); renderExperts(); closeExpertModal();
+  showToast(icon + ' Expert "' + name + '" ' + (editId ? 'modifié' : 'créé'), 'success');
+}
+
 // ═══════════════════════════════════════════════════════════════
 // PROJECTS & SIDEBAR — Folder style
 // ═══════════════════════════════════════════════════════════════
