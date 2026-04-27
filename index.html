@@ -10,6 +10,7 @@
 <script src="https://cdnjs.cloudflare.com/ajax/libs/marked/12.0.1/marked.min.js"></script>
 <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/KaTeX/0.16.9/katex.min.css">
 <script src="https://cdnjs.cloudflare.com/ajax/libs/KaTeX/0.16.9/katex.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/KaTeX/0.16.9/contrib/mhchem.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/KaTeX/0.16.9/contrib/auto-render.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/highlight.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/docx@9.1.0/build/index.umd.min.js"></script>
@@ -3233,8 +3234,74 @@ function renderMessage(msg, idx, conv) {
 
   return `<div class="message" data-msg-idx="${idx}"><div class="message-header"><div class="message-avatar assistant">◇</div><span class="message-role">${getProviderName(msg.model||conv.model)}</span><span class="message-model">${getModelShort(msg.model||conv.model)}</span>${webBadge}</div>${thinkHtml}${searchHtml}<div class="message-content">${renderMarkdown(msg.content||'')}</div>${artBadges}<div class="message-actions"><button class="msg-action-btn" onclick="generateWordFromMessage(${idx})" title="Générer un document Word">📝 Word</button><button class="msg-action-btn" onclick="exportMessagePdf(${idx})" title="Exporter en PDF">📄 PDF</button><button class="msg-action-btn" onclick="copyMessageText(${idx})" title="Copier le texte">📋 Copier</button></div></div>`;
 }
+// ═══════════════════════════════════════════════════════════════
+// LATEX → UNICODE CONVERTER (fallback when KaTeX fails)
+// ═══════════════════════════════════════════════════════════════
+function latexToUnicode(latex) {
+  var t = latex;
+  var LB = String.fromCharCode(123), RB = String.fromCharCode(125);
+  // Remove environments
+  t = t.replace(new RegExp('\\\\begin' + LB + '[^' + RB + ']*' + RB, 'g'), '');
+  t = t.replace(new RegExp('\\\\end' + LB + '[^' + RB + ']*' + RB, 'g'), '');
+  // \ce{...}
+  t = t.replace(new RegExp('\\\\ce' + LB + '([^' + RB + ']*)' + RB, 'g'), '$1');
+  // \text{}, \mathrm{}, \mathbf{}, \operatorname{}
+  t = t.replace(new RegExp('\\\\text(?:rm|bf|it|sf)?' + LB + '([^' + RB + ']*)' + RB, 'g'), '$1');
+  t = t.replace(new RegExp('\\\\math(?:rm|bf|it|sf|bb|cal)?' + LB + '([^' + RB + ']*)' + RB, 'g'), '$1');
+  t = t.replace(new RegExp('\\\\operatorname' + LB + '([^' + RB + ']*)' + RB, 'g'), '$1');
+  // \frac{a}{b} → a/b
+  t = t.replace(new RegExp('\\\\(?:d|t)?frac' + LB + '([^' + RB + ']*)' + RB + LB + '([^' + RB + ']*)' + RB, 'g'), '$1/$2');
+  // \sqrt
+  t = t.replace(new RegExp('\\\\sqrt' + LB + '([^' + RB + ']*)' + RB, 'g'), '√$1');
+  // Subscripts
+  var subMap = {'0':'₀','1':'₁','2':'₂','3':'₃','4':'₄','5':'₅','6':'₆','7':'₇','8':'₈','9':'₉','a':'ₐ','e':'ₑ','i':'ᵢ','n':'ₙ','o':'ₒ','r':'ᵣ','x':'ₓ','+':'₊','-':'₋','=':'₌','(':'₍',')':'₎'};
+  t = t.replace(new RegExp('_' + LB + '([^' + RB + ']*)' + RB, 'g'), function(_, s) { return s.split('').map(function(c){return subMap[c]||c;}).join(''); });
+  t = t.replace(/_([0-9a-z+\-])/gi, function(_, c) { return subMap[c.toLowerCase()] || c; });
+  // Superscripts
+  var supMap = {'0':'⁰','1':'¹','2':'²','3':'³','4':'⁴','5':'⁵','6':'⁶','7':'⁷','8':'⁸','9':'⁹','+':'⁺','-':'⁻','=':'⁼','(':'⁽',')':'⁾','n':'ⁿ','i':'ⁱ'};
+  t = t.replace(new RegExp('\\^' + LB + '([^' + RB + ']*)' + RB, 'g'), function(_, s) { return s.split('').map(function(c){return supMap[c]||c;}).join(''); });
+  t = t.replace(/\^([0-9+\-ni])/gi, function(_, c) { return supMap[c.toLowerCase()] || c; });
+  // Greek
+  var gr = {alpha:'α',beta:'β',gamma:'γ',delta:'δ',epsilon:'ε',zeta:'ζ',eta:'η',theta:'θ',iota:'ι',kappa:'κ',lambda:'λ',mu:'μ',nu:'ν',xi:'ξ',pi:'π',rho:'ρ',sigma:'σ',tau:'τ',phi:'φ',chi:'χ',psi:'ψ',omega:'ω',Delta:'Δ',Gamma:'Γ',Lambda:'Λ',Sigma:'Σ',Omega:'Ω',Pi:'Π',Phi:'Φ',Theta:'Θ'};
+  for (var g in gr) t = t.replace(new RegExp('\\\\' + g + '(?![a-zA-Z])', 'g'), gr[g]);
+  // Symbols
+  t=t.replace(/\\times/g,'×');t=t.replace(/\\div/g,'÷');t=t.replace(/\\pm/g,'±');t=t.replace(/\\mp/g,'∓');
+  t=t.replace(/\\neq/g,'≠');t=t.replace(/\\leq/g,'≤');t=t.replace(/\\geq/g,'≥');t=t.replace(/\\approx/g,'≈');t=t.replace(/\\equiv/g,'≡');
+  t=t.replace(/\\infty/g,'∞');t=t.replace(/\\circ/g,'°');t=t.replace(/\\degree/g,'°');
+  t=t.replace(/\\rightarrow/g,'→');t=t.replace(/\\leftarrow/g,'←');t=t.replace(/\\leftrightarrow/g,'↔');
+  t=t.replace(/\\Rightarrow/g,'⇒');t=t.replace(/\\Leftarrow/g,'⇐');t=t.replace(/\\rightleftharpoons/g,'⇌');
+  t=t.replace(/\\cdot/g,'·');t=t.replace(/\\bullet/g,'•');t=t.replace(/\\sum/g,'Σ');t=t.replace(/\\prod/g,'Π');t=t.replace(/\\int/g,'∫');
+  t=t.replace(/\\partial/g,'∂');t=t.replace(/\\nabla/g,'∇');t=t.replace(/\\forall/g,'∀');t=t.replace(/\\exists/g,'∃');
+  t=t.replace(/\\in\b/g,'∈');t=t.replace(/\\notin/g,'∉');t=t.replace(/\\subset/g,'⊂');t=t.replace(/\\cup/g,'∪');t=t.replace(/\\cap/g,'∩');
+  t=t.replace(/\\emptyset/g,'∅');t=t.replace(/\\neg/g,'¬');t=t.replace(/\\angle/g,'∠');t=t.replace(/\\perp/g,'⊥');
+  // Chemistry arrows
+  t=t.replace(/->/g,'→');t=t.replace(/<->/g,'↔');t=t.replace(/<=>/g,'⇌');
+  // Fractions
+  t=t.replace(/\b1\/2\b/g,'½');t=t.replace(/\b1\/4\b/g,'¼');t=t.replace(/\b3\/4\b/g,'¾');
+  // Layout
+  t=t.replace(/\\[;:!,]/g,' ');t=t.replace(/\\\\/g,'\n');t=t.replace(/&/g,'  ');
+  t=t.replace(/\\quad/g,'  ');t=t.replace(/\\qquad/g,'    ');
+  t=t.replace(/\\left/g,'');t=t.replace(/\\right/g,'');t=t.replace(/\\big/gi,'');
+  t=t.replace(new RegExp('\\\\hspace' + LB + '[^' + RB + ']*' + RB, 'g'), ' ');
+  // Cleanup
+  t=t.replace(/\\[a-zA-Z]+/g,'');
+  t=t.replace(new RegExp('[' + LB + RB + ']', 'g'), '');
+  t=t.replace(/[ \t]{2,}/g,' ');t=t.replace(/\n{3,}/g,'\n\n');
+  return t.trim();
+}
+function latexToUnicodeHtml(latex) {
+  var t = latexToUnicode(latex);
+  return t.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/\n/g,'<br>');
+}
+
 function renderMarkdown(text) {
   if (!text) return '';
+  // Pre-clean: convert bare LaTeX that KaTeX might not handle
+  // Strip \ce{} when mhchem fails to load, handle \begin{aligned} etc.
+  text = text.replace(/\\ce\s*\{([^}]*)\}/g, function(_, inner) {
+    try { if (typeof katex !== 'undefined') { katex.renderToString('\\ce{' + inner + '}', {throwOnError:true}); return '\\ce{' + inner + '}'; } } catch(e) {}
+    return inner.replace(/->/g,'→').replace(/<->/g,'↔').replace(/<=>/g,'⇌').replace(/\^{([^}]*)}/g, function(_,s) { var m={'0':'⁰','1':'¹','2':'²','3':'³','4':'⁴','5':'⁵','6':'⁶','7':'⁷','8':'⁸','9':'⁹','+':'⁺','-':'⁻'}; return s.split('').map(function(c){return m[c]||c;}).join(''); }).replace(/_{([^}]*)}/g, function(_,s) { var m={'0':'₀','1':'₁','2':'₂','3':'₃','4':'₄','5':'₅','6':'₆','7':'₇','8':'₈','9':'₉','+':'₊','-':'₋'}; return s.split('').map(function(c){return m[c]||c;}).join(''); }).replace(/_([0-9])/g,function(_,c){return '₀₁₂₃₄₅₆₇₈₉'[+c];}).replace(/\^([0-9])/g,function(_,c){return '⁰¹²³⁴⁵⁶⁷⁸⁹'[+c];});
+  });
 
   // KaTeX-aware marked extensions — must be registered once
   if (!renderMarkdown._katexRegistered) {
@@ -3252,12 +3319,8 @@ function renderMarkdown(text) {
               if (m) return { type: 'blockMath', raw: m[0], text: m[1] };
             },
             renderer(token) {
-              if (typeof katex === 'undefined') return '<pre>' + token.raw + '</pre>';
-              try {
-                return '<div style="text-align:center;overflow-x:auto;padding:8px 0">'
-                  + katex.renderToString(token.text.trim(), { displayMode: true, throwOnError: false })
-                  + '</div>';
-              } catch(e) { return '<pre>' + token.raw + '</pre>'; }
+              try { if (typeof katex !== 'undefined') return '<div style="text-align:center;overflow-x:auto;padding:8px 0">' + katex.renderToString(token.text.trim(), { displayMode: true, throwOnError: true }) + '</div>'; } catch(e) {}
+              return '<div style="text-align:center;padding:8px 0;font-family:serif;font-size:1.05em">' + latexToUnicodeHtml(token.text) + '</div>';
             }
           },
           // Inline math  $...$
@@ -3266,16 +3329,13 @@ function renderMarkdown(text) {
             level: 'inline',
             start(src) { return src.indexOf('$'); },
             tokenizer(src) {
-              // avoid matching $$ (handled by blockMath)
               if (src.startsWith('$$')) return;
               const m = src.match(/^\$([^\$\n]+?)\$/);
               if (m) return { type: 'inlineMath', raw: m[0], text: m[1] };
             },
             renderer(token) {
-              if (typeof katex === 'undefined') return token.raw;
-              try {
-                return katex.renderToString(token.text.trim(), { displayMode: false, throwOnError: false });
-              } catch(e) { return token.raw; }
+              try { if (typeof katex !== 'undefined') return katex.renderToString(token.text.trim(), { displayMode: false, throwOnError: true }); } catch(e) {}
+              return '<span style="font-family:serif">' + latexToUnicodeHtml(token.text) + '</span>';
             }
           },
           // \[ ... \]  display math
@@ -3288,12 +3348,8 @@ function renderMarkdown(text) {
               if (m) return { type: 'displayMathBracket', raw: m[0], text: m[1] };
             },
             renderer(token) {
-              if (typeof katex === 'undefined') return '<pre>' + token.raw + '</pre>';
-              try {
-                return '<div style="text-align:center;overflow-x:auto;padding:8px 0">'
-                  + katex.renderToString(token.text.trim(), { displayMode: true, throwOnError: false })
-                  + '</div>';
-              } catch(e) { return '<pre>' + token.raw + '</pre>'; }
+              try { if (typeof katex !== 'undefined') return '<div style="text-align:center;overflow-x:auto;padding:8px 0">' + katex.renderToString(token.text.trim(), { displayMode: true, throwOnError: true }) + '</div>'; } catch(e) {}
+              return '<div style="text-align:center;padding:8px 0;font-family:serif;font-size:1.05em">' + latexToUnicodeHtml(token.text) + '</div>';
             }
           },
           // \( ... \)  inline math
@@ -3306,10 +3362,8 @@ function renderMarkdown(text) {
               if (m) return { type: 'inlineMathParen', raw: m[0], text: m[1] };
             },
             renderer(token) {
-              if (typeof katex === 'undefined') return token.raw;
-              try {
-                return katex.renderToString(token.text.trim(), { displayMode: false, throwOnError: false });
-              } catch(e) { return token.raw; }
+              try { if (typeof katex !== 'undefined') return katex.renderToString(token.text.trim(), { displayMode: false, throwOnError: true }); } catch(e) {}
+              return '<span style="font-family:serif">' + latexToUnicodeHtml(token.text) + '</span>';
             }
           }
         ]
