@@ -1273,6 +1273,7 @@ textarea.param-input { min-height: 70px; resize: vertical; font-size: 12px; line
           <span class="tok-out" title="Tokens sortie">↓ <b id="tokOut">0</b></span>
           <span class="tok-think" title="Tokens thinking" id="tokThinkWrap" style="display:none">💭 <b id="tokThink">0</b></span>
         </div>
+        <span id="syncIndicator" title="Synchronisation Gist" style="font-size:14px;cursor:pointer;display:none" onclick="toggleKeysMenu()"></span>
         <button class="header-btn" id="paramsToggleBtn" onclick="toggleParamsPanel()">⚙ Paramètres</button>
         <button class="header-btn" id="contextToggleBtn" onclick="toggleContextPanel()">📋 Contexte</button>
         <div class="keys-dropdown-wrap">
@@ -1333,6 +1334,20 @@ textarea.param-input { min-height: 70px; resize: vertical; font-size: 12px; line
                 <button class="api-key-toggle" onclick="toggleOpenRouterKeyVisibility()">👁</button>
               </div>
               <div class="api-status disconnected" id="openrouterApiStatus"><span class="dot"></span><span id="openrouterApiStatusText">—</span></div>
+            </div>
+            <div style="border-top:1px solid var(--border);margin:8px 0 4px;padding-top:8px">
+              <div class="api-key-section">
+                <label>GitHub Token (Sync) <span style="font-size:9px;color:var(--text-tertiary)">scope: gist</span></label>
+                <div class="api-key-input-wrap">
+                  <input type="password" id="githubTokenInput" placeholder="ghp_..." oninput="saveGithubToken()">
+                  <button class="api-key-toggle" onclick="toggleGithubTokenVisibility()">👁</button>
+                </div>
+                <div class="api-status disconnected" id="githubSyncStatus"><span class="dot"></span><span id="githubSyncStatusText">—</span></div>
+                <div style="display:flex;gap:4px;margin-top:4px">
+                  <button onclick="gistSyncPush()" style="flex:1;padding:5px;border:1px solid var(--border);border-radius:4px;background:var(--bg-tertiary);color:var(--text-primary);cursor:pointer;font-size:11px">⬆ Sauvegarder</button>
+                  <button onclick="gistSyncPull()" style="flex:1;padding:5px;border:1px solid var(--border);border-radius:4px;background:var(--bg-tertiary);color:var(--text-primary);cursor:pointer;font-size:11px">⬇ Récupérer</button>
+                </div>
+              </div>
             </div>
           </div>
         </div>
@@ -1981,7 +1996,7 @@ const PRESETS = {
 // INIT
 // ═══════════════════════════════════════════════════════════════
 document.addEventListener('DOMContentLoaded', () => {
-  loadApiKey(); loadOpenAIApiKey(); loadDeepSeekApiKey(); loadGeminiApiKey(); loadGroqApiKey(); loadMistralApiKey(); loadOpenRouterApiKey(); loadParams(); loadContext(); loadExperts(); loadProjects(); renderSidebar(); renderExperts(); updateKeysBadge();
+  loadApiKey(); loadOpenAIApiKey(); loadDeepSeekApiKey(); loadGeminiApiKey(); loadGroqApiKey(); loadMistralApiKey(); loadOpenRouterApiKey(); loadGithubToken(); loadParams(); loadContext(); loadExperts(); loadProjects(); renderSidebar(); renderExperts(); updateKeysBadge(); gistAutoLoad();
   setTimeout(function() { if (typeof updateWebSearchAvailability === 'function') updateWebSearchAvailability(); }, 100);
   // Verify docx library loaded
   setTimeout(() => {
@@ -2216,7 +2231,7 @@ function getParams() {
     frequencyPenalty: parseFloat(document.getElementById('frequencyPenalty').value)
   };
 }
-function saveParams() { localStorage.setItem('cs_params', JSON.stringify(getParams())); }
+function saveParams() { localStorage.setItem('cs_params', JSON.stringify(getParams())); if (typeof scheduleGistSync === 'function') scheduleGistSync(); }
 function loadParams() {
   const s = JSON.parse(localStorage.getItem('cs_params') || '{}');
   // If no saved params at all, apply balanced preset as default
@@ -3066,16 +3081,11 @@ function renderStopSequences() {
 // ═══════════════════════════════════════════════════════════════
 function saveConversations() {
   try {
-    // Strip heavy binary data (generatedImages) before saving to localStorage
     var toSave = conversations.map(function(c) {
       var clone = Object.assign({}, c);
       if (c.messages) {
         clone.messages = c.messages.map(function(m) {
-          if (m.generatedImages) {
-            var mc = Object.assign({}, m);
-            delete mc.generatedImages;
-            return mc;
-          }
+          if (m.generatedImages) { var mc = Object.assign({}, m); delete mc.generatedImages; return mc; }
           return m;
         });
       }
@@ -3084,10 +3094,9 @@ function saveConversations() {
     localStorage.setItem('cs_convs', JSON.stringify(toSave));
   } catch (e) {
     console.error('[saveConversations] localStorage full:', e);
-    if (typeof showToast === 'function') {
-      showToast('⚠ Stockage local plein. Exportez/supprimez d\'anciennes conversations avec pièces jointes volumineuses.', 'error');
-    }
+    if (typeof showToast === 'function') showToast('⚠ Stockage local plein.', 'error');
   }
+  if (typeof scheduleGistSync === 'function') scheduleGistSync();
 }
 function newConversation() {
   activeProjectId = null;
@@ -4577,6 +4586,7 @@ function loadExperts() {
 }
 function saveExperts() {
   try { localStorage.setItem('cs_experts', JSON.stringify(experts)); } catch(e) {}
+  if (typeof scheduleGistSync === 'function') scheduleGistSync();
 }
 function saveExpandedExperts() { localStorage.setItem('cs_expert_expanded', JSON.stringify([...expandedExperts])); }
 
@@ -5116,6 +5126,217 @@ function updateTokenDisplay() {
   if (sessionTokens.thinking > 0) { document.getElementById('tokThinkWrap').style.display = ''; document.getElementById('tokThink').textContent = sessionTokens.thinking.toLocaleString('fr'); }
 }
 function escapeHtml(s) { const d = document.createElement('div'); d.textContent = s; return d.innerHTML; }
+
+// ═══════════════════════════════════════════════════════════════
+// GIST SYNC — Auto-synchronize data via GitHub Gist
+// ═══════════════════════════════════════════════════════════════
+var gistSyncTimer = null;
+var gistId = null;
+const GIST_FILENAME = 'ia-genius-sync.json';
+
+function loadGithubToken() {
+  var key = localStorage.getItem('cs_github_token') || '';
+  var el = document.getElementById('githubTokenInput');
+  if (el) el.value = key;
+  gistId = localStorage.getItem('cs_gist_id') || null;
+  updateGithubSyncStatus(!!key);
+  updateSyncIndicator('idle');
+}
+function saveGithubToken() {
+  var val = document.getElementById('githubTokenInput').value.trim();
+  localStorage.setItem('cs_github_token', val);
+  updateGithubSyncStatus(!!val);
+  if (!val) { gistId = null; localStorage.removeItem('cs_gist_id'); updateSyncIndicator('off'); }
+  else updateSyncIndicator('idle');
+}
+function updateGithubSyncStatus(ok) {
+  var el = document.getElementById('githubSyncStatus');
+  if (el) el.className = 'api-status ' + (ok ? 'connected' : 'disconnected');
+  var txt = document.getElementById('githubSyncStatusText');
+  if (txt) txt.textContent = ok ? (gistId ? 'Gist connecté' : 'Token OK — cliquez Sauvegarder') : 'Non configuré';
+}
+function toggleGithubTokenVisibility() {
+  var i = document.getElementById('githubTokenInput');
+  if (i) i.type = i.type === 'password' ? 'text' : 'password';
+}
+function updateSyncIndicator(state) {
+  var el = document.getElementById('syncIndicator');
+  if (!el) return;
+  var token = (document.getElementById('githubTokenInput') || {}).value;
+  if (!token) { el.style.display = 'none'; return; }
+  el.style.display = 'inline';
+  if (state === 'saving') { el.textContent = '↻'; el.title = 'Synchronisation en cours...'; el.style.color = 'var(--warning, orange)'; }
+  else if (state === 'ok') { el.textContent = '☁✓'; el.title = 'Synchronisé'; el.style.color = 'var(--success, #5ab87a)'; }
+  else if (state === 'error') { el.textContent = '☁✕'; el.title = 'Erreur de synchronisation'; el.style.color = 'var(--error, #d45a5a)'; }
+  else { el.textContent = '☁'; el.title = 'Gist sync configuré'; el.style.color = 'var(--text-tertiary)'; }
+}
+
+function buildSyncData() {
+  // Strip binary data from conversations before sync
+  var convsCopy = conversations.map(function(c) {
+    var clone = Object.assign({}, c);
+    if (c.messages) {
+      clone.messages = c.messages.map(function(m) {
+        var mc = Object.assign({}, m);
+        delete mc.generatedImages;
+        if (mc.attachments) {
+          mc.attachments = mc.attachments.map(function(a) {
+            var ac = Object.assign({}, a);
+            delete ac.data; delete ac.previewUrl;
+            return ac;
+          });
+        }
+        return mc;
+      });
+    }
+    return clone;
+  });
+  return {
+    version: 2,
+    timestamp: new Date().toISOString(),
+    conversations: convsCopy,
+    experts: experts,
+    projects: projects,
+    params: getParams(),
+    expandedProjects: [...expandedProjects],
+    expandedExperts: [...expandedExperts],
+    activeExpertId: activeExpertId
+  };
+}
+
+function applySyncData(data) {
+  if (!data || !data.conversations) return;
+  conversations = data.conversations || [];
+  experts = data.experts || [];
+  projects = data.projects || [];
+  if (data.expandedProjects) expandedProjects = new Set(data.expandedProjects);
+  if (data.expandedExperts) expandedExperts = new Set(data.expandedExperts);
+  if (data.activeExpertId !== undefined) {
+    activeExpertId = data.activeExpertId;
+    if (activeExpertId) localStorage.setItem('cs_active_expert', activeExpertId);
+    else localStorage.removeItem('cs_active_expert');
+  }
+  // Restore params (except keys)
+  if (data.params) {
+    var sp = document.getElementById('systemPrompt');
+    if (sp && data.params.systemPrompt !== undefined) sp.value = data.params.systemPrompt;
+    var ms = document.getElementById('modelSelect');
+    if (ms && data.params.model) {
+      for (var i = 0; i < ms.options.length; i++) {
+        if (ms.options[i].value === data.params.model) { ms.selectedIndex = i; break; }
+      }
+    }
+    var tr = document.getElementById('temperatureRange');
+    var tv = document.getElementById('temperatureValue');
+    if (tr && data.params.temperature !== undefined) { tr.value = data.params.temperature; if (tv) tv.textContent = data.params.temperature; }
+  }
+  saveConversations(); saveExperts(); saveParams();
+  localStorage.setItem('cs_proj_expanded', JSON.stringify([...expandedProjects]));
+  localStorage.setItem('cs_expert_expanded', JSON.stringify([...expandedExperts]));
+  try { localStorage.setItem('cs_projects', JSON.stringify(projects)); } catch(e) {}
+  renderSidebar();
+}
+
+async function gistGetHeaders() {
+  var token = (document.getElementById('githubTokenInput') || {}).value || '';
+  if (!token) throw new Error('Token GitHub non configuré');
+  return { 'Authorization': 'token ' + token, 'Content-Type': 'application/json', 'Accept': 'application/vnd.github.v3+json' };
+}
+
+async function gistFindExisting(headers) {
+  // Check stored gist ID first
+  if (gistId) {
+    try {
+      var resp = await fetch('https://api.github.com/gists/' + gistId, { headers: headers });
+      if (resp.ok) return gistId;
+    } catch(e) {}
+    gistId = null; localStorage.removeItem('cs_gist_id');
+  }
+  // Search in user's gists
+  var resp = await fetch('https://api.github.com/gists?per_page=100', { headers: headers });
+  if (!resp.ok) throw new Error('Erreur GitHub API: ' + resp.status);
+  var gists = await resp.json();
+  for (var g of gists) {
+    if (g.files && g.files[GIST_FILENAME]) {
+      gistId = g.id;
+      localStorage.setItem('cs_gist_id', gistId);
+      return gistId;
+    }
+  }
+  return null;
+}
+
+async function gistSyncPush() {
+  try {
+    updateSyncIndicator('saving');
+    var headers = await gistGetHeaders();
+    var data = buildSyncData();
+    var files = {};
+    files[GIST_FILENAME] = { content: JSON.stringify(data) };
+    var existingId = await gistFindExisting(headers);
+    var resp;
+    if (existingId) {
+      resp = await fetch('https://api.github.com/gists/' + existingId, {
+        method: 'PATCH', headers: headers, body: JSON.stringify({ files: files })
+      });
+    } else {
+      resp = await fetch('https://api.github.com/gists', {
+        method: 'POST', headers: headers,
+        body: JSON.stringify({ description: 'IA-Genius sync data', public: false, files: files })
+      });
+    }
+    if (!resp.ok) { var err = await resp.json().catch(function(){return {};}); throw new Error(err.message || 'HTTP ' + resp.status); }
+    var result = await resp.json();
+    gistId = result.id;
+    localStorage.setItem('cs_gist_id', gistId);
+    updateGithubSyncStatus(true);
+    updateSyncIndicator('ok');
+    showToast('☁✓ Données synchronisées vers Gist', 'success');
+  } catch(e) {
+    console.error('[Gist Sync Push]', e);
+    updateSyncIndicator('error');
+    showToast('⚠ Sync échouée : ' + e.message, 'error');
+  }
+}
+
+async function gistSyncPull() {
+  try {
+    updateSyncIndicator('saving');
+    var headers = await gistGetHeaders();
+    var existingId = await gistFindExisting(headers);
+    if (!existingId) { showToast('Aucun Gist trouvé — sauvegardez d\'abord', 'error'); updateSyncIndicator('idle'); return; }
+    var resp = await fetch('https://api.github.com/gists/' + existingId, { headers: headers });
+    if (!resp.ok) throw new Error('HTTP ' + resp.status);
+    var gist = await resp.json();
+    var file = gist.files[GIST_FILENAME];
+    if (!file || !file.content) throw new Error('Fichier sync introuvable dans le Gist');
+    var data = JSON.parse(file.content);
+    applySyncData(data);
+    updateSyncIndicator('ok');
+    showToast('☁✓ Données récupérées depuis Gist (' + (data.conversations||[]).length + ' conversations)', 'success');
+  } catch(e) {
+    console.error('[Gist Sync Pull]', e);
+    updateSyncIndicator('error');
+    showToast('⚠ Récupération échouée : ' + e.message, 'error');
+  }
+}
+
+// Auto-save: trigger 10s after last modification
+function scheduleGistSync() {
+  var token = (document.getElementById('githubTokenInput') || {}).value;
+  if (!token) return;
+  if (gistSyncTimer) clearTimeout(gistSyncTimer);
+  gistSyncTimer = setTimeout(function() { gistSyncPush(); }, 10000);
+}
+
+// Auto-load on startup if token is configured
+function gistAutoLoad() {
+  var token = localStorage.getItem('cs_github_token') || '';
+  if (token && gistId) {
+    // Silently pull on load after a brief delay
+    setTimeout(function() { gistSyncPull(); }, 2000);
+  }
+}
 
 function exportConversation() {
   const conv = getCurrentConversation();
