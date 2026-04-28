@@ -5181,8 +5181,9 @@ function buildSyncData() {
         delete mc.generatedImages;
         if (mc.attachments) {
           mc.attachments = mc.attachments.map(function(a) {
-            var ac = Object.assign({}, a);
-            delete ac.data; delete ac.previewUrl;
+            var ac = { name: a.name, size: a.size, type: a.type, isImage: !!a.isImage, isPdf: !!a.isPdf, isDocx: !!a.isDocx, isXlsx: !!a.isXlsx, isText: !!a.isText };
+            if (a.textContent && a.textContent.length <= 50000) ac.textContent = a.textContent;
+            else if (a.textContent) ac.textContent = a.textContent.slice(0, 50000) + '\n[... tronqué pour sync]';
             return ac;
           });
         }
@@ -5271,8 +5272,13 @@ async function gistSyncPush() {
     updateSyncIndicator('saving');
     var headers = await gistGetHeaders();
     var data = buildSyncData();
+    // Validate JSON before sending
+    var jsonStr = JSON.stringify(data);
+    try { JSON.parse(jsonStr); } catch(valErr) {
+      throw new Error('JSON invalide avant envoi — données corrompues localement');
+    }
     var files = {};
-    files[GIST_FILENAME] = { content: JSON.stringify(data) };
+    files[GIST_FILENAME] = { content: jsonStr };
     var existingId = await gistFindExisting(headers);
     var resp;
     if (existingId) {
@@ -5291,7 +5297,7 @@ async function gistSyncPush() {
     localStorage.setItem('cs_gist_id', gistId);
     updateGithubSyncStatus(true);
     updateSyncIndicator('ok');
-    showToast('☁✓ Données synchronisées vers Gist', 'success');
+    showToast('☁✓ Synchronisé (' + Math.round(jsonStr.length/1024) + ' KB)', 'success');
   } catch(e) {
     console.error('[Gist Sync Push]', e);
     updateSyncIndicator('error');
@@ -5309,8 +5315,43 @@ async function gistSyncPull() {
     if (!resp.ok) throw new Error('HTTP ' + resp.status);
     var gist = await resp.json();
     var file = gist.files[GIST_FILENAME];
-    if (!file || !file.content) throw new Error('Fichier sync introuvable dans le Gist');
-    var data = JSON.parse(file.content);
+    if (!file) throw new Error('Fichier sync introuvable dans le Gist');
+    // If file is truncated (>1MB), fetch raw content via raw_url
+    var content = file.content;
+    if (file.truncated && file.raw_url) {
+      var rawResp = await fetch(file.raw_url, { headers: headers });
+      if (!rawResp.ok) throw new Error('Impossible de récupérer le fichier brut: HTTP ' + rawResp.status);
+      content = await rawResp.text();
+    }
+    if (!content) throw new Error('Contenu vide');
+    var data;
+    try {
+      data = JSON.parse(content);
+    } catch(parseErr) {
+      console.error('[Gist Sync] JSON corrompu, tentative de réparation...');
+      // Try to fix common JSON issues: unterminated strings
+      var fixed = content;
+      // If truncated, try to close the JSON cleanly
+      if (fixed.length > 100) {
+        // Find last complete object/array
+        var lastBrace = Math.max(fixed.lastIndexOf('}'), fixed.lastIndexOf(']'));
+        if (lastBrace > 0) {
+          fixed = fixed.slice(0, lastBrace + 1);
+          // Balance remaining braces
+          var opens = (fixed.match(/\{/g) || []).length - (fixed.match(/\}/g) || []).length;
+          var openBrackets = (fixed.match(/\[/g) || []).length - (fixed.match(/\]/g) || []).length;
+          for (var i = 0; i < openBrackets; i++) fixed += ']';
+          for (var j = 0; j < opens; j++) fixed += '}';
+          try { data = JSON.parse(fixed); } catch(e2) {}
+        }
+      }
+      if (!data) {
+        showToast('⚠ Gist corrompu. Cliquez ⬆ Sauvegarder pour réécrire avec les données locales.', 'error');
+        updateSyncIndicator('error');
+        return;
+      }
+      showToast('⚠ Gist partiellement récupéré (données tronquées)', 'error');
+    }
     applySyncData(data);
     updateSyncIndicator('ok');
     showToast('☁✓ Données récupérées depuis Gist (' + (data.conversations||[]).length + ' conversations)', 'success');
@@ -5326,7 +5367,7 @@ function scheduleGistSync() {
   var token = (document.getElementById('githubTokenInput') || {}).value;
   if (!token) return;
   if (gistSyncTimer) clearTimeout(gistSyncTimer);
-  gistSyncTimer = setTimeout(function() { gistSyncPush(); }, 10000);
+  gistSyncTimer = setTimeout(function() { gistSyncPush(); }, 300000);
 }
 
 // Auto-load on startup if token is configured
@@ -5334,7 +5375,7 @@ function gistAutoLoad() {
   var token = localStorage.getItem('cs_github_token') || '';
   if (token && gistId) {
     // Silently pull on load after a brief delay
-    setTimeout(function() { gistSyncPull(); }, 2000);
+    setTimeout(function() { gistSyncPull(); }, 5000);
   }
 }
 
