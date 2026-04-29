@@ -5162,7 +5162,8 @@ function toggleGithubTokenVisibility() {
 function updateSyncIndicator(state) {
   var el = document.getElementById('syncIndicator');
   if (!el) return;
-  var token = (document.getElementById('githubTokenInput') || {}).value;
+  var inputEl = document.getElementById('githubTokenInput');
+  var token = (inputEl && inputEl.value) ? inputEl.value.trim() : (localStorage.getItem('cs_github_token') || '');
   if (!token) { el.style.display = 'none'; return; }
   el.style.display = 'inline';
   if (state === 'saving') { el.textContent = '↻'; el.title = 'Synchronisation en cours...'; el.style.color = 'var(--warning, orange)'; }
@@ -5239,8 +5240,10 @@ function applySyncData(data) {
 }
 
 async function gistGetHeaders() {
-  var token = (document.getElementById('githubTokenInput') || {}).value || '';
-  if (!token) throw new Error('Token GitHub non configuré');
+  var el = document.getElementById('githubTokenInput');
+  var token = (el && el.value) ? el.value.trim() : '';
+  if (!token) token = localStorage.getItem('cs_github_token') || '';
+  if (!token) throw new Error('Token GitHub non configuré — entrez-le dans 🔑 Clés');
   return { 'Authorization': 'token ' + token, 'Content-Type': 'application/json', 'Accept': 'application/vnd.github.v3+json' };
 }
 
@@ -5364,7 +5367,8 @@ async function gistSyncPull() {
 
 // Auto-save: trigger 10s after last modification
 function scheduleGistSync() {
-  var token = (document.getElementById('githubTokenInput') || {}).value;
+  var el = document.getElementById('githubTokenInput');
+  var token = (el && el.value) ? el.value.trim() : (localStorage.getItem('cs_github_token') || '');
   if (!token) return;
   if (gistSyncTimer) clearTimeout(gistSyncTimer);
   gistSyncTimer = setTimeout(function() { gistSyncPush(); }, 300000);
