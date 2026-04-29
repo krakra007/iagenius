@@ -1,4 +1,4 @@
-<!DOCTYPE html>
+  <!DOCTYPE html>
 <html lang="fr">
 <head>
 <meta charset="UTF-8">
@@ -1736,6 +1736,30 @@ let isStreaming = false;
 let abortController = null;
 let canUseAbort = true;
 
+// Auto-cleanup: remove conversations inactive for more than 30 days
+(function cleanupOldConversations() {
+  var THIRTY_DAYS = 30 * 24 * 60 * 60 * 1000;
+  var now = Date.now();
+  var before = conversations.length;
+  conversations = conversations.filter(function(c) {
+    // Use lastActivity if available, otherwise fall back to createdAt
+    var lastDate = c.lastActivity || c.createdAt;
+    if (!lastDate) return true; // Keep if no date at all
+    var age = now - new Date(lastDate).getTime();
+    // Keep if less than 30 days old OR if conversation has messages (not empty)
+    if (age < THIRTY_DAYS) return true;
+    // Old and empty → remove silently
+    if (!c.messages || c.messages.length === 0) return false;
+    // Old with messages → remove
+    return false;
+  });
+  var removed = before - conversations.length;
+  if (removed > 0) {
+    try { localStorage.setItem('cs_convs', JSON.stringify(conversations)); } catch(e) {}
+    console.log('[IA-Genius] Nettoyage automatique : ' + removed + ' conversation(s) inactive(s) depuis 30+ jours supprimée(s)');
+  }
+})();
+
 // Test if AbortController works in this environment
 try { const t = new AbortController(); t.abort(); } catch(e) { canUseAbort = false; }
 
@@ -3142,6 +3166,8 @@ function newConversation() {
 }
 function switchToConversation(id) {
   currentConvId = id;
+  var conv = conversations.find(function(c) { return c.id === id; });
+  if (conv) { conv.lastActivity = new Date().toISOString(); saveConversations(); }
   document.getElementById('welcomeScreen').style.display = 'none';
   document.getElementById('chatMessages').style.display = 'block';
   renderMessages(); renderConversations();
@@ -4331,6 +4357,7 @@ async function _sendMessageCore() {
     mediaType: a.mediaType, data: a.data, textContent: a.textContent,
     previewUrl: a.isImage && a.data ? 'data:' + a.mediaType + ';base64,' + a.data : null
   })) : undefined });
+  conv.lastActivity = new Date().toISOString();
   updateConversationTitle(conv); saveConversations();
   input.value = ''; input.style.height = 'auto'; updateCharCount();
   document.getElementById('welcomeScreen').style.display = 'none';
