@@ -258,6 +258,22 @@ body {
 .expert-active-folder { background: var(--accent-alpha); }
 .expert-active-folder .folder-name { color: var(--accent); font-weight: 600; }
 
+/* Move conversation menu */
+.move-menu-overlay { position: fixed; inset: 0; z-index: 100; background: rgba(0,0,0,0.3); }
+.move-menu {
+  position: fixed; z-index: 101; min-width: 200px; max-width: 280px;
+  background: var(--bg-secondary); border: 1px solid var(--border);
+  border-radius: var(--radius-md); box-shadow: var(--shadow-lg);
+  overflow: hidden; max-height: 300px; overflow-y: auto;
+  animation: msgIn 0.15s ease;
+}
+.move-menu-item {
+  padding: 8px 12px; font-size: 13px; cursor: pointer;
+  color: var(--text-primary); display: flex; align-items: center; gap: 8px;
+  transition: background 0.1s;
+}
+.move-menu-item:hover { background: var(--bg-hover); }
+
 /* Modal */
 .proj-modal-overlay {
   position: fixed; inset: 0; background: rgba(0,0,0,0.5);
@@ -4808,10 +4824,15 @@ function renderSidebar() {
 
   function convItem(c, indented) {
     const cls = ['conv-item', c.id === currentConvId ? 'active' : '', indented ? 'indented' : ''].join(' ').trim();
+    // Show move button only for free conversations (not in a project or expert)
+    const moveBtn = (!indented && !c.projectId && !c.expertId)
+      ? `<button class="conv-item-delete" onclick="event.stopPropagation();showMoveMenu('${c.id}',this)" title="Déplacer vers un projet/expert">📂</button>`
+      : '';
     return `<div class="${cls}" onclick="switchToConversation('${c.id}')">
       <span class="conv-item-title" ondblclick="event.stopPropagation();startRenameConv('${c.id}',this)">${escapeHtml(c.title)}</span>
       <div class="conv-item-meta">
         <span class="conv-model-badge">${getModelShort(c.model)}</span>
+        ${moveBtn}
         <button class="conv-item-delete" onclick="event.stopPropagation();startRenameConvFromBtn('${c.id}')" title="Renommer">✎</button>
         <button class="conv-item-delete" onclick="deleteConversation('${c.id}', event)">✕</button>
       </div>
@@ -4891,6 +4912,75 @@ function renderSidebar() {
 function renderProjects() { renderSidebar(); }
 function renderConversations() { renderSidebar(); }
 function filterConversations() { renderSidebar(); }
+
+// ── Move conversation to project/expert ──
+function showMoveMenu(convId, btnEl) {
+  // Remove any existing move menu
+  closeMoveMenu();
+  var conv = conversations.find(function(c) { return c.id === convId; });
+  if (!conv) return;
+
+  var html = '<div class="move-menu-overlay" id="moveMenuOverlay" onclick="closeMoveMenu()">'
+    + '<div class="move-menu" onclick="event.stopPropagation()">'
+    + '<div style="font-size:12px;font-weight:700;padding:6px 10px;color:var(--text-tertiary);border-bottom:1px solid var(--border)">Déplacer vers...</div>';
+
+  // List experts
+  if (experts.length > 0) {
+    html += '<div style="font-size:10px;font-weight:700;padding:6px 10px 2px;color:var(--text-tertiary);text-transform:uppercase">Experts</div>';
+    experts.forEach(function(ex) {
+      html += '<div class="move-menu-item" onclick="moveConversationTo(\'' + convId + '\',\'expert\',\'' + ex.id + '\')">'
+        + '<span>' + (ex.icon || '🧠') + '</span> ' + escapeHtml(ex.name) + '</div>';
+    });
+  }
+
+  // List projects
+  if (projects.length > 0) {
+    html += '<div style="font-size:10px;font-weight:700;padding:6px 10px 2px;color:var(--text-tertiary);text-transform:uppercase">Projets</div>';
+    projects.forEach(function(p) {
+      html += '<div class="move-menu-item" onclick="moveConversationTo(\'' + convId + '\',\'project\',\'' + p.id + '\')">'
+        + '<span style="color:' + p.color + '">●</span> ' + escapeHtml(p.name) + '</div>';
+    });
+  }
+
+  if (experts.length === 0 && projects.length === 0) {
+    html += '<div style="padding:10px;font-size:12px;color:var(--text-tertiary);text-align:center">Aucun projet ou expert créé</div>';
+  }
+
+  html += '</div></div>';
+  document.body.insertAdjacentHTML('beforeend', html);
+
+  // Position menu near the button
+  var menu = document.querySelector('.move-menu');
+  var rect = btnEl.getBoundingClientRect();
+  menu.style.top = Math.min(rect.bottom + 4, window.innerHeight - menu.offsetHeight - 10) + 'px';
+  menu.style.left = Math.min(rect.left, window.innerWidth - menu.offsetWidth - 10) + 'px';
+}
+
+function closeMoveMenu() {
+  var ov = document.getElementById('moveMenuOverlay');
+  if (ov) ov.remove();
+}
+
+function moveConversationTo(convId, type, targetId) {
+  var conv = conversations.find(function(c) { return c.id === convId; });
+  if (!conv) return;
+  if (type === 'project') {
+    conv.projectId = targetId;
+    delete conv.expertId;
+    var proj = projects.find(function(p) { return p.id === targetId; });
+    expandedProjects.add(targetId); saveExpanded();
+    showToast('📂 Déplacée vers ' + (proj ? proj.name : 'projet'), 'success');
+  } else if (type === 'expert') {
+    conv.expertId = targetId;
+    delete conv.projectId;
+    var ex = experts.find(function(e) { return e.id === targetId; });
+    expandedExperts.add(targetId); saveExpandedExperts();
+    showToast((ex ? ex.icon : '🧠') + ' Déplacée vers ' + (ex ? ex.name : 'expert'), 'success');
+  }
+  closeMoveMenu();
+  saveConversations();
+  renderSidebar();
+}
 
 function startRenameConvFromBtn(convId) {
   const items = document.querySelectorAll('.conv-item');
