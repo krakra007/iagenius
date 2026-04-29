@@ -5173,18 +5173,24 @@ function updateSyncIndicator(state) {
 }
 
 function buildSyncData() {
-  // Strip binary data from conversations before sync
+  // Strip binary data and cap content size for sync
+  var MAX_MSG = 10000;   // 10KB per message content
+  var MAX_ATT = 20000;   // 20KB per attachment text
   var convsCopy = conversations.map(function(c) {
     var clone = Object.assign({}, c);
     if (c.messages) {
       clone.messages = c.messages.map(function(m) {
         var mc = Object.assign({}, m);
         delete mc.generatedImages;
+        // Cap message content
+        if (mc.content && mc.content.length > MAX_MSG) {
+          mc.content = mc.content.slice(0, MAX_MSG) + '\n[... tronqué pour sync]';
+        }
         if (mc.attachments) {
           mc.attachments = mc.attachments.map(function(a) {
             var ac = { name: a.name, size: a.size, type: a.type, isImage: !!a.isImage, isPdf: !!a.isPdf, isDocx: !!a.isDocx, isXlsx: !!a.isXlsx, isText: !!a.isText };
-            if (a.textContent && a.textContent.length <= 50000) ac.textContent = a.textContent;
-            else if (a.textContent) ac.textContent = a.textContent.slice(0, 50000) + '\n[... tronqué pour sync]';
+            if (a.textContent && a.textContent.length <= MAX_ATT) ac.textContent = a.textContent;
+            else if (a.textContent) ac.textContent = a.textContent.slice(0, MAX_ATT) + '\n[... tronqué pour sync]';
             return ac;
           });
         }
@@ -5277,6 +5283,15 @@ async function gistSyncPush() {
     var data = buildSyncData();
     // Validate JSON before sending
     var jsonStr = JSON.stringify(data);
+    // If too large (>900KB), trim oldest conversations
+    if (jsonStr.length > 900000) {
+      console.warn('[Gist Sync] Data too large (' + Math.round(jsonStr.length/1024) + 'KB), trimming old conversations...');
+      while (jsonStr.length > 900000 && data.conversations.length > 5) {
+        data.conversations.pop(); // Remove oldest
+        jsonStr = JSON.stringify(data);
+      }
+      showToast('⚠ Données trop volumineuses — anciennes conversations exclues de la sync', 'error');
+    }
     try { JSON.parse(jsonStr); } catch(valErr) {
       throw new Error('JSON invalide avant envoi — données corrompues localement');
     }
@@ -5322,7 +5337,7 @@ async function gistSyncPull() {
     // If file is truncated (>1MB), fetch raw content via raw_url
     var content = file.content;
     if (file.truncated && file.raw_url) {
-      var rawResp = await fetch(file.raw_url, { headers: headers });
+      var rawResp = await fetch(file.raw_url);
       if (!rawResp.ok) throw new Error('Impossible de récupérer le fichier brut: HTTP ' + rawResp.status);
       content = await rawResp.text();
     }
