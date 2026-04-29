@@ -125,6 +125,16 @@ body {
 }
 .sidebar-search input:focus { border-color: var(--accent); }
 .sidebar-search input::placeholder { color: var(--text-tertiary); }
+.search-wrap { position: relative; }
+.search-wrap input { width: 100%; box-sizing: border-box; padding-right: 28px; }
+.search-clear-btn {
+  position: absolute; right: 6px; top: 50%; transform: translateY(-50%);
+  background: none; border: none; color: var(--text-secondary); cursor: pointer;
+  font-size: 14px; padding: 2px 6px; border-radius: 50%; line-height: 1;
+  display: none; align-items: center; justify-content: center;
+  width: 20px; height: 20px;
+}
+.search-clear-btn:hover { color: var(--text-primary); background: var(--bg-hover); }
 
 /* ── Unified sidebar list ── */
 .sidebar-list { flex: 1; overflow-y: auto; padding: 4px 8px; }
@@ -1149,7 +1159,10 @@ textarea.param-input { min-height: 70px; resize: vertical; font-size: 12px; line
       <button class="new-chat-btn" onclick="newConversation()">+ Nouveau</button>
     </div>
     <div class="sidebar-search">
-      <input type="text" placeholder="Rechercher..." id="searchConv" oninput="filterConversations()">
+      <div class="search-wrap">
+        <input type="text" placeholder="Rechercher..." id="searchConv" oninput="filterConversations();toggleSearchClear()">
+        <button class="search-clear-btn" id="searchClearBtn" onclick="clearSearch()">✕</button>
+      </div>
     </div>
 
     <!-- EXPERTS -->
@@ -4912,6 +4925,21 @@ function renderSidebar() {
 function renderProjects() { renderSidebar(); }
 function renderConversations() { renderSidebar(); }
 function filterConversations() { renderSidebar(); }
+
+function clearSearch() {
+  var el = document.getElementById('searchConv');
+  if (el) { el.value = ''; el.focus(); }
+  toggleSearchClear();
+  filterConversations();
+}
+function toggleSearchClear() {
+  var el = document.getElementById('searchConv');
+  var btn = document.getElementById('searchClearBtn');
+  if (btn) {
+    var show = el && el.value.length > 0;
+    btn.style.display = show ? 'flex' : 'none';
+  }
+}
 
 // ── Move conversation to project/expert ──
 function showMoveMenu(convId, btnEl) {
