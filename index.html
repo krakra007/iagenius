@@ -2,7 +2,7 @@
 <html lang="fr">
 <head>
 <meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
 <title>IA-Genius v2.1</title>
 <link rel="icon" type="image/svg+xml" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Cdefs%3E%3ClinearGradient id='g' x1='0%25' y1='0%25' x2='100%25' y2='100%25'%3E%3Cstop offset='0%25' stop-color='%23D97757'/%3E%3Cstop offset='100%25' stop-color='%23C4643A'/%3E%3C/linearGradient%3E%3C/defs%3E%3Crect width='64' height='64' rx='14' fill='url(%23g)'/%3E%3Cpath d='M32 12 C34 22, 42 30, 52 32 C42 34, 34 42, 32 52 C30 42, 22 34, 12 32 C22 30, 30 22, 32 12Z' fill='white' opacity='0.95'/%3E%3C/svg%3E">
 <link rel="preconnect" href="https://fonts.googleapis.com">
@@ -1146,6 +1146,315 @@ textarea.param-input { min-height: 70px; resize: vertical; font-size: 12px; line
   .input-area { padding: 10px 12px 14px; }
   .token-display { display: none; }
 }
+
+
+/* ═══════════════════════════════════════════════════════════════
+   ANDROID / MOBILE RESPONSIVE LAYER — non-destructive desktop add-on
+   Keeps the desktop layout unchanged and turns side panels into touch drawers.
+   ═══════════════════════════════════════════════════════════════ */
+.mobile-overlay {
+  display: none;
+  position: fixed;
+  inset: 0;
+  background: rgba(0,0,0,0.48);
+  z-index: 18;
+  opacity: 0;
+  transition: opacity 0.18s ease;
+  -webkit-tap-highlight-color: transparent;
+}
+.mobile-overlay.active { display: block; opacity: 1; }
+
+@supports (height: 100dvh) {
+  body, .app { height: 100dvh; }
+}
+
+@media (max-width: 768px) {
+  :root {
+    --sidebar-width: min(86vw, 340px);
+    --panel-width: 100vw;
+    --header-height: 52px;
+  }
+
+  html, body {
+    width: 100%;
+    height: 100dvh;
+    min-height: 100dvh;
+    overflow: hidden;
+    overscroll-behavior: none;
+    -webkit-text-size-adjust: 100%;
+    touch-action: manipulation;
+  }
+
+  body.mobile-android .app,
+  .app {
+    position: relative;
+    width: 100vw;
+    height: 100dvh;
+    min-height: 100dvh;
+    overflow: hidden;
+  }
+
+  .main {
+    width: 100vw;
+    min-width: 0;
+    flex: 1 1 auto;
+  }
+
+  /* Left sidebar becomes a real drawer instead of a zero-width desktop collapse. */
+  .sidebar {
+    position: fixed !important;
+    left: 0;
+    top: 0;
+    bottom: 0;
+    height: 100dvh !important;
+    width: var(--sidebar-width) !important;
+    min-width: var(--sidebar-width) !important;
+    max-width: 92vw;
+    z-index: 30;
+    opacity: 1 !important;
+    pointer-events: auto !important;
+    border-right: 1px solid var(--border) !important;
+    box-shadow: 6px 0 28px rgba(0,0,0,0.45);
+    transform: translateX(0);
+    transition: transform 0.25s cubic-bezier(.4,0,.2,1);
+  }
+  .sidebar.collapsed {
+    transform: translateX(-105%) !important;
+    width: var(--sidebar-width) !important;
+    min-width: var(--sidebar-width) !important;
+    opacity: 1 !important;
+    pointer-events: auto !important;
+  }
+  .sidebar-h-resizer,
+  .sidebar-resizer { display: none !important; }
+  .sidebar-reopen-btn {
+    display: none !important;
+    position: fixed;
+    top: max(10px, env(safe-area-inset-top));
+    left: 10px;
+    z-index: 35;
+  }
+
+  /* Header compact enough for phones while keeping all main controls reachable. */
+  .main-header {
+    height: var(--header-height);
+    padding: max(6px, env(safe-area-inset-top)) 8px 6px;
+    gap: 6px;
+    flex-wrap: nowrap;
+  }
+  .header-left { flex: 1 1 auto; min-width: 0; gap: 6px; }
+  .header-right { flex: 0 0 auto; gap: 4px; }
+  .toggle-sidebar-btn {
+    width: 38px;
+    height: 38px;
+    padding: 0;
+    justify-content: center;
+    font-size: 20px;
+    flex-shrink: 0;
+  }
+  .model-selector { min-width: 0; flex: 1 1 auto; }
+  .model-selector select {
+    width: 100%;
+    max-width: 48vw;
+    height: 38px;
+    font-size: 12px;
+    padding: 7px 26px 7px 9px;
+  }
+  .token-display { display: none !important; }
+  .header-btn {
+    height: 38px;
+    max-width: 42px;
+    min-width: 38px;
+    overflow: hidden;
+    white-space: nowrap;
+    padding: 0 10px;
+    justify-content: flex-start;
+    font-size: 18px;
+    line-height: 1;
+  }
+  .header-btn .keys-badge {
+    position: absolute;
+    transform: translate(14px, -12px);
+    font-size: 9px;
+  }
+  #syncIndicator { display: inline-flex; align-items: center; justify-content: center; min-width: 22px; }
+
+  /* API keys menu: phone-friendly sheet. */
+  .keys-dropdown {
+    position: fixed !important;
+    top: calc(var(--header-height) + env(safe-area-inset-top));
+    right: 8px;
+    left: 8px;
+    width: auto !important;
+    max-width: none !important;
+    max-height: calc(100dvh - var(--header-height) - 24px);
+    overflow-y: auto;
+    z-index: 50;
+  }
+
+  /* Right panels become full-screen / near-full-screen drawers. */
+  .params-panel,
+  .context-panel,
+  .preview-panel {
+    position: fixed !important;
+    top: 0;
+    right: 0;
+    bottom: 0;
+    height: 100dvh !important;
+    width: 100vw !important;
+    min-width: 100vw !important;
+    max-width: 100vw !important;
+    z-index: 40;
+    opacity: 1 !important;
+    pointer-events: auto !important;
+    border-left: 1px solid var(--border) !important;
+    transform: translateX(0);
+    box-shadow: -6px 0 28px rgba(0,0,0,0.45);
+    transition: transform 0.25s cubic-bezier(.4,0,.2,1);
+  }
+  .params-panel.collapsed,
+  .context-panel.collapsed,
+  .preview-panel.collapsed {
+    transform: translateX(105%) !important;
+    width: 100vw !important;
+    min-width: 100vw !important;
+    opacity: 1 !important;
+    pointer-events: none !important;
+  }
+  .params-header,
+  .ctx-header,
+  .preview-header {
+    height: var(--header-height);
+    padding: max(8px, env(safe-area-inset-top)) 12px 8px;
+  }
+  .params-body,
+  .ctx-body {
+    padding: 12px;
+    padding-bottom: calc(24px + env(safe-area-inset-bottom));
+  }
+
+  /* Preview / artifacts on phone. */
+  .preview-header-left { min-width: 0; }
+  .preview-header-actions { gap: 3px; }
+  .preview-action-btn {
+    padding: 5px 8px;
+    font-size: 11px;
+  }
+  .preview-tabs {
+    overflow-x: auto;
+    -webkit-overflow-scrolling: touch;
+  }
+  .preview-tab { padding: 8px 12px; }
+  .doc-preview-container { padding: 14px 10px; }
+  .doc-page {
+    max-width: 100%;
+    padding: 28px 20px;
+    font-size: 14px;
+    line-height: 1.65;
+  }
+  .preview-code-wrap pre { padding: 14px; }
+
+  /* Chat area. */
+  .chat-container {
+    height: auto;
+    overflow-y: auto;
+    -webkit-overflow-scrolling: touch;
+    overscroll-behavior: contain;
+  }
+  .chat-messages {
+    max-width: none;
+    width: 100%;
+    padding: 12px 10px 8px;
+  }
+  .welcome-screen {
+    height: 100%;
+    padding: 24px 14px;
+  }
+  .welcome-logo { width: 52px; height: 52px; margin-bottom: 14px; }
+  .welcome-screen h1 { font-size: 21px; }
+  .welcome-screen p { font-size: 13px; margin-bottom: 18px; }
+  .welcome-tip { padding: 12px; }
+  .message { padding: 10px 0; }
+  .message-content {
+    padding-left: 0;
+    font-size: 16px;
+    line-height: 1.65;
+  }
+  .message-header { margin-bottom: 6px; }
+  .message.user-msg .message-content {
+    max-width: 94%;
+    font-size: 16px;
+    padding: 9px 13px;
+  }
+  .message-content table,
+  .doc-page table {
+    display: block;
+    overflow-x: auto;
+    -webkit-overflow-scrolling: touch;
+    white-space: nowrap;
+  }
+  .message-content pre,
+  .doc-page pre {
+    overflow-x: auto;
+    -webkit-overflow-scrolling: touch;
+  }
+  .message-content img { max-height: 55vh; }
+  .thinking-block {
+    margin-left: 0;
+    padding: 10px 12px;
+  }
+  .msg-attachments { padding-left: 0; }
+  .msg-attach-thumb { width: 96px; max-height: 96px; }
+
+  /* Touch input: larger target, safe-area padding, Android keyboard tolerance. */
+  .input-area {
+    padding: 8px 10px calc(10px + env(safe-area-inset-bottom));
+    flex-shrink: 0;
+  }
+  .input-wrapper { max-width: none; }
+  .input-box {
+    border-radius: 15px;
+    padding: 10px 52px 10px 13px;
+  }
+  .input-box textarea {
+    font-size: 16px;
+    line-height: 1.45;
+    min-height: 24px;
+    max-height: 34dvh;
+  }
+  .send-btn,
+  .stop-btn {
+    width: 36px;
+    height: 36px;
+    border-radius: 10px;
+  }
+  .input-footer {
+    font-size: 10px;
+    gap: 8px;
+    overflow: hidden;
+  }
+
+  /* Forms and modals are easier to operate by touch. */
+  input, select, textarea, button { font-size: 16px; }
+  .param-input,
+  .ctx-instructions,
+  .api-key-input-wrap input,
+  .sidebar-search input { font-size: 16px; }
+  .proj-modal,
+  .artifact-modal {
+    width: calc(100vw - 24px) !important;
+    max-width: calc(100vw - 24px) !important;
+  }
+  .lightbox img { max-width: 96vw; max-height: 86dvh; }
+}
+
+@media (max-width: 420px) {
+  .model-selector select { max-width: 42vw; font-size: 11px; }
+  .header-btn { max-width: 38px; min-width: 36px; padding: 0 8px; }
+  .doc-page { padding: 24px 16px; }
+  .message-content { font-size: 15.5px; }
+}
+
 </style>
 </head>
 <body>
@@ -5797,7 +6106,205 @@ function openPrintPage(contentHtml, title, meta) {
     '<div class="doc-footer"><span>IA-Genius</span><span>' + dateStr + '</span></div>' +
     '<script>window.onafterprint=function(){window.close()};' +
     'setTimeout(function(){window.print()},600);<\/script>' +
-    '</body></html>');
+    '
+
+<script>
+/* ═══════════════════════════════════════════════════════════════
+   ANDROID / MOBILE BEHAVIOR LAYER — added without altering Gist sync.
+   Gist auto-load and auto-save timings remain governed by existing code.
+   ═══════════════════════════════════════════════════════════════ */
+(function() {
+  var MOBILE_MAX = 768;
+  var overlay;
+
+  function isMobileWidth() {
+    return window.matchMedia && window.matchMedia('(max-width: ' + MOBILE_MAX + 'px)').matches;
+  }
+
+  function ensureOverlay() {
+    overlay = document.getElementById('mobileOverlay');
+    if (!overlay) {
+      overlay = document.createElement('div');
+      overlay.id = 'mobileOverlay';
+      overlay.className = 'mobile-overlay';
+      overlay.setAttribute('aria-hidden', 'true');
+      document.body.appendChild(overlay);
+      overlay.addEventListener('click', closeMobileDrawers);
+    }
+  }
+
+  function setDynamicViewportHeight() {
+    var h = (window.visualViewport && window.visualViewport.height) ? window.visualViewport.height : window.innerHeight;
+    document.documentElement.style.setProperty('--mobile-vh', h + 'px');
+  }
+
+  function anyDrawerOpen() {
+    var sidebar = document.getElementById('sidebar');
+    var params = document.getElementById('paramsPanel');
+    var context = document.getElementById('contextPanel');
+    var preview = document.getElementById('previewPanel');
+    return !!(
+      sidebar && !sidebar.classList.contains('collapsed') ||
+      params && !params.classList.contains('collapsed') ||
+      context && !context.classList.contains('collapsed') ||
+      preview && !preview.classList.contains('collapsed')
+    );
+  }
+
+  function updateMobileOverlay() {
+    ensureOverlay();
+    if (!isMobileWidth()) {
+      overlay.classList.remove('active');
+      return;
+    }
+    overlay.classList.toggle('active', anyDrawerOpen());
+  }
+
+  function closeMobileDrawers() {
+    if (!isMobileWidth()) return;
+    var sidebar = document.getElementById('sidebar');
+    var params = document.getElementById('paramsPanel');
+    var context = document.getElementById('contextPanel');
+    var preview = document.getElementById('previewPanel');
+    var paramsBtn = document.getElementById('paramsToggleBtn');
+    var contextBtn = document.getElementById('contextToggleBtn');
+    if (sidebar) sidebar.classList.add('collapsed');
+    if (params) params.classList.add('collapsed');
+    if (context) context.classList.add('collapsed');
+    if (preview) preview.classList.add('collapsed');
+    if (paramsBtn) paramsBtn.classList.remove('active');
+    if (contextBtn) contextBtn.classList.remove('active');
+    updateMobileOverlay();
+  }
+
+  function applyMobileMode() {
+    var app = document.querySelector('.app');
+    var mobile = isMobileWidth();
+    document.body.classList.toggle('mobile-android', mobile);
+    if (app) app.classList.toggle('mobile-layout', mobile);
+
+    var sidebar = document.getElementById('sidebar');
+    if (mobile && sidebar) {
+      sidebar.classList.add('collapsed');
+      sidebar.style.width = '';
+      sidebar.style.minWidth = '';
+    }
+    updateMobileOverlay();
+  }
+
+  function patchDrawerFunctions() {
+    if (window.__iaGeniusMobilePatched) return;
+    window.__iaGeniusMobilePatched = true;
+
+    var originalToggleSidebar = window.toggleSidebar;
+    if (typeof originalToggleSidebar === 'function') {
+      window.toggleSidebar = function() {
+        if (isMobileWidth()) {
+          var sidebar = document.getElementById('sidebar');
+          if (!sidebar) return;
+          sidebar.classList.toggle('collapsed');
+          updateMobileOverlay();
+          return;
+        }
+        originalToggleSidebar.apply(this, arguments);
+      };
+    }
+
+    var originalToggleParams = window.toggleParamsPanel;
+    if (typeof originalToggleParams === 'function') {
+      window.toggleParamsPanel = function() {
+        originalToggleParams.apply(this, arguments);
+        if (isMobileWidth()) {
+          var sidebar = document.getElementById('sidebar');
+          if (sidebar) sidebar.classList.add('collapsed');
+        }
+        updateMobileOverlay();
+      };
+    }
+
+    var originalToggleContext = window.toggleContextPanel;
+    if (typeof originalToggleContext === 'function') {
+      window.toggleContextPanel = function() {
+        originalToggleContext.apply(this, arguments);
+        if (isMobileWidth()) {
+          var sidebar = document.getElementById('sidebar');
+          if (sidebar) sidebar.classList.add('collapsed');
+        }
+        updateMobileOverlay();
+      };
+    }
+
+    var originalOpenPreview = window.openPreview;
+    if (typeof originalOpenPreview === 'function') {
+      window.openPreview = function() {
+        originalOpenPreview.apply(this, arguments);
+        if (isMobileWidth()) {
+          var sidebar = document.getElementById('sidebar');
+          if (sidebar) sidebar.classList.add('collapsed');
+        }
+        updateMobileOverlay();
+      };
+    }
+
+    var originalClosePreview = window.closePreview;
+    if (typeof originalClosePreview === 'function') {
+      window.closePreview = function() {
+        originalClosePreview.apply(this, arguments);
+        updateMobileOverlay();
+      };
+    }
+  }
+
+  function installMobileEventHandlers() {
+    document.addEventListener('click', function(e) {
+      if (!isMobileWidth()) return;
+      if (e.target.closest('.conv-item') || e.target.closest('.new-chat-btn') || e.target.closest('.welcome-tip')) {
+        setTimeout(function() {
+          var sidebar = document.getElementById('sidebar');
+          if (sidebar) sidebar.classList.add('collapsed');
+          updateMobileOverlay();
+        }, 80);
+      }
+    }, true);
+
+    document.addEventListener('keydown', function(e) {
+      if (e.key === 'Escape') closeMobileDrawers();
+    });
+
+    var prompt = document.getElementById('promptInput');
+    if (prompt && window.visualViewport) {
+      prompt.addEventListener('focus', function() {
+        setTimeout(function() {
+          try { prompt.scrollIntoView({ block: 'nearest', behavior: 'smooth' }); } catch(e) {}
+        }, 250);
+      });
+    }
+  }
+
+  function initMobileLayer() {
+    ensureOverlay();
+    setDynamicViewportHeight();
+    patchDrawerFunctions();
+    installMobileEventHandlers();
+    applyMobileMode();
+  }
+
+  if (document.readyState === 'loading') {
+    document.addEventListener('DOMContentLoaded', initMobileLayer);
+  } else {
+    initMobileLayer();
+  }
+  window.addEventListener('resize', function() {
+    setDynamicViewportHeight();
+    applyMobileMode();
+  });
+  if (window.visualViewport) {
+    window.visualViewport.addEventListener('resize', setDynamicViewportHeight);
+  }
+})();
+</script>
+
+</body></html>');
   win.document.close();
 }
 
