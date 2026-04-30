@@ -1238,6 +1238,9 @@ textarea.param-input { min-height: 70px; resize: vertical; font-size: 12px; line
               <option value="o3-mini">o3-mini</option>
               <option value="o1">o1</option>
             </optgroup>
+            <optgroup label="── OpenAI Image ──">
+              <option value="gpt-image-1">GPT Image 🎨</option>
+            </optgroup>
             <optgroup label="── DeepSeek V4 (Nouveau) ──">
               <option value="deepseek-v4-pro">DeepSeek V4 Pro (1.6T params)</option>
               <option value="deepseek-v4-flash">DeepSeek V4 Flash (rapide)</option>
@@ -3206,6 +3209,7 @@ function getModelShort(m) {
     'gpt-4.1':'GPT-4.1', 'gpt-4.1-mini':'4.1 mini', 'gpt-4.1-nano':'4.1 nano',
     'gpt-4o':'GPT-4o', 'gpt-4o-mini':'4o-mini',
     'o1':'o1', 'o3':'o3', 'o3-mini':'o3-mini', 'o4-mini':'o4-mini',
+    'gpt-image-1':'GPT Image',
     'deepseek-v4-pro':'DS V4 Pro', 'deepseek-v4-flash':'DS V4 Flash',
     'deepseek-chat':'DS-Chat', 'deepseek-reasoner':'DS-Reason',
     'gemini-3.1-pro-preview':'G3.1 Pro', 'gemini-3-flash-preview':'G3 Flash',
@@ -3600,7 +3604,7 @@ RÈGLES STRICTES :
 // ═══════════════════════════════════════════════════════════════
 // OPENAI ROUTING
 // ═══════════════════════════════════════════════════════════════
-const OPENAI_MODELS = new Set(['gpt-5.4','gpt-5.4-mini','gpt-5.4-nano','gpt-5','gpt-5-mini','gpt-5-nano','gpt-5.2','gpt-4.1','gpt-4.1-mini','gpt-4.1-nano','gpt-4o','gpt-4o-mini','o1','o3','o3-mini','o3-pro','o4-mini']);
+const OPENAI_MODELS = new Set(['gpt-5.5','gpt-5.4','gpt-5.4-mini','gpt-5.4-nano','gpt-5','gpt-5-mini','gpt-5-nano','gpt-5.2','gpt-4.1','gpt-4.1-mini','gpt-4.1-nano','gpt-4o','gpt-4o-mini','o1','o3','o3-mini','o3-pro','o4-mini','gpt-image-1']);
 const DEEPSEEK_MODELS = new Set(['deepseek-v4-pro','deepseek-v4-flash','deepseek-chat','deepseek-reasoner']);
 const GEMINI_MODELS = new Set(['gemini-3.1-pro-preview','gemini-3-flash-preview','gemini-3.1-flash-lite-preview','gemini-3.1-flash-image-preview','gemini-2.5-pro','gemini-2.5-flash','gemini-2.5-flash-lite']);
 const GROQ_MODELS = new Set(['llama-3.3-70b-versatile','llama-3.1-8b-instant','meta-llama/llama-4-scout-17b-16e-instruct','openai/gpt-oss-120b','openai/gpt-oss-20b']);
@@ -3793,6 +3797,61 @@ async function regularOpenAIResponse(conv, apiKey, params) {
   if (tOAI) msgOAI.thinking = tOAI;
   conv.messages.push(msgOAI);
   removeTypingIndicator();
+}
+
+// ── OpenAI Image Generation (gpt-image-2 / gpt-image-1) ──
+async function generateOpenAIImage(conv, apiKey, params, prompt) {
+  showToast('🎨 Génération d\'image via OpenAI...', 'success');
+  removeTypingIndicator();
+  var chatMessages = document.getElementById('chatMessages');
+  var msgDiv = document.createElement('div');
+  msgDiv.className = 'message';
+  msgDiv.innerHTML = '<div class="message-header"><div class="message-avatar assistant">◇</div><span class="message-role">OpenAI</span><span class="message-model">Image</span></div><div class="message-content" id="liveContent"><span class="streaming-cursor"></span> Génération en cours...</div>';
+  chatMessages.appendChild(msgDiv);
+  scrollToBottom();
+  var contentDiv = document.getElementById('liveContent');
+  try {
+    var response = await fetch('https://api.openai.com/v1/images/generations', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + apiKey },
+      body: JSON.stringify({
+        model: 'gpt-image-1',
+        prompt: prompt,
+        n: 1,
+        size: '1024x1024',
+        quality: 'medium'
+      })
+    });
+    if (!response.ok) {
+      var err = await response.json().catch(function() { return {}; });
+      throw new Error(err.error?.message || 'HTTP ' + response.status);
+    }
+    var data = await response.json();
+    // gpt-image-1 returns b64_json by default
+    var imageB64 = data.data?.[0]?.b64_json;
+    var imageUrl = data.data?.[0]?.url;
+    var revisedPrompt = data.data?.[0]?.revised_prompt || '';
+    var imageHtml = '';
+    if (imageB64) {
+      imageHtml = '![Image générée](data:image/png;base64,' + imageB64 + ')';
+    } else if (imageUrl) {
+      imageHtml = '![Image générée](' + imageUrl + ')';
+    } else {
+      throw new Error('Aucune image retournée par l\'API');
+    }
+    var textContent = '';
+    if (revisedPrompt) textContent = '*Prompt révisé : ' + revisedPrompt + '*\n\n';
+    textContent += imageHtml;
+    conv.messages.push({ role: 'assistant', content: textContent, model: 'gpt-image-1' });
+    contentDiv.innerHTML = renderMarkdown(textContent);
+    saveConversations();
+  } catch(e) {
+    console.error('[OpenAI Image]', e);
+    contentDiv.innerHTML = '<span style="color:var(--error)">⚠ Erreur génération image : ' + escapeHtml(e.message) + '</span>';
+    conv.messages.push({ role: 'assistant', content: '⚠ Erreur : ' + e.message, model: 'gpt-image-1' });
+    saveConversations();
+  }
+  scrollToBottom();
 }
 
 function getDeepSeekHeaders(apiKey) {
@@ -4394,7 +4453,11 @@ async function _sendMessageCore() {
       if (params.stream) await streamDeepSeekResponse(conv, deepseekKey, params);
       else await regularDeepSeekResponse(conv, deepseekKey, params);
     } else if (usingOpenAI) {
-      if (params.stream) await streamOpenAIResponse(conv, openaiKey, params);
+      // Check if user wants an image — use Images API instead of Chat
+      var lastUserMsg2 = [...conv.messages].reverse().find(function(m) { return m.role === 'user'; });
+      if (params.model === 'gpt-image-1' || (lastUserMsg2 && isImageRequest(lastUserMsg2.content))) {
+        await generateOpenAIImage(conv, openaiKey, params, lastUserMsg2 ? lastUserMsg2.content : text);
+      } else if (params.stream) { await streamOpenAIResponse(conv, openaiKey, params); }
       else await regularOpenAIResponse(conv, openaiKey, params);
     } else {
       if (params.stream) await streamResponse(conv, apiKey, params);
