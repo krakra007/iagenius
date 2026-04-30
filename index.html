@@ -1,4 +1,4 @@
-  <!DOCTYPE html>
+<!DOCTYPE html>
 <html lang="fr">
 <head>
 <meta charset="UTF-8">
@@ -1172,7 +1172,7 @@ textarea.param-input { min-height: 70px; resize: vertical; font-size: 12px; line
         <button class="proj-icon-btn" onclick="openExpertModal()" title="Nouvel expert">＋</button>
       </div>
     </div>
-    <div id="expertsFolders"></div>
+    <div id="expertsFolders" style="padding:2px 8px;max-height:40vh;overflow-y:auto"></div>
 
     <!-- PROJECTS TOOLBAR -->
     <div class="projects-header">
@@ -2261,9 +2261,16 @@ function toggleOpenRouterKeyVisibility() {
 // PARAMS
 // ═══════════════════════════════════════════════════════════════
 function getParams() {
+  // If current conversation belongs to an expert, use expert's systemPrompt directly
+  var systemPrompt = (document.getElementById('systemPrompt') || {value:''}).value;
+  var conv = typeof getCurrentConversation === 'function' ? getCurrentConversation() : null;
+  if (conv && conv.expertId) {
+    var ex = (typeof experts !== 'undefined') ? experts.find(function(e) { return e.id === conv.expertId; }) : null;
+    if (ex && ex.systemPrompt) systemPrompt = ex.systemPrompt;
+  }
   return {
     model: document.getElementById('modelSelect').value,
-    systemPrompt: (document.getElementById('systemPrompt') || {value:''}).value,
+    systemPrompt: systemPrompt,
     temperature: parseFloat(document.getElementById('temperature').value),
     topP: parseFloat(document.getElementById('topP').value),
     topK: parseInt(document.getElementById('topK').value),
@@ -2554,6 +2561,9 @@ function updateCtxIndicator() {
 }
 
 function getContextSystemPrompt() {
+  // If current conversation belongs to an expert, context is disabled
+  var conv = getCurrentConversation();
+  if (conv && conv.expertId) return '';
   var instrText = ctxInstructions.filter(function(i){return i.enabled && i.text.trim()}).map(function(i){return i.text.trim()}).join('\n\n');
   const textFiles = contextFiles.filter(f => f.isText && f.textContent);
   if (!instrText && textFiles.length === 0) return '';
@@ -2569,6 +2579,8 @@ function getContextSystemPrompt() {
 }
 
 function getContextPdfBlocks() {
+  var conv = getCurrentConversation();
+  if (conv && conv.expertId) return [];
   return contextFiles.filter(f => f.isPdf && f.data).map(f => ({
     type: 'document', source: { type: 'base64', media_type: 'application/pdf', data: f.data }, title: f.name
   }));
@@ -4836,6 +4848,13 @@ function saveExpertFromModal(editId) {
     experts.push({ id: Date.now().toString(36) + Math.random().toString(36).slice(2, 5), name: name, systemPrompt: prompt, icon: icon, model: model || null, temperature: temp });
   }
   saveExperts(); renderSidebar(); closeExpertModal();
+  // If this expert is active, update the DOM systemPrompt field
+  var savedId = editId || experts[experts.length - 1].id;
+  if (activeExpertId === savedId) {
+    var spEl = document.getElementById('systemPrompt');
+    if (spEl) spEl.value = prompt;
+    saveParams();
+  }
   showToast(icon + ' Expert "' + name + '" ' + (editId ? 'modifié' : 'créé'), 'success');
 }
 
