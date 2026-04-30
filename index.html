@@ -898,6 +898,18 @@ textarea.param-input { min-height: 70px; resize: vertical; font-size: 12px; line
 /* ── Images ── */
 .message-content img { max-width: 100%; max-height: 512px; border-radius: var(--radius-sm); margin: 12px 0; cursor: pointer; object-fit: contain; }
 
+/* Floating copy button on assistant messages */
+.copy-float-btn {
+  position: absolute; top: 4px; right: 4px;
+  background: var(--bg-tertiary); border: 1px solid var(--border);
+  color: var(--text-tertiary); cursor: pointer;
+  padding: 5px; border-radius: 6px; line-height: 0;
+  opacity: 0; transition: opacity 0.15s;
+  z-index: 2;
+}
+.message-content:hover .copy-float-btn { opacity: 1; }
+.copy-float-btn:hover { background: var(--bg-hover); color: var(--text-primary); }
+
 /* ── Definition lists / details ── */
 .message-content details { margin: 10px 0; padding: 10px 14px; background: var(--bg-tertiary); border-radius: var(--radius-sm); border: 1px solid var(--border); }
 .message-content summary { cursor: pointer; font-weight: 600; color: var(--accent); }
@@ -3353,7 +3365,7 @@ function renderMessage(msg, idx, conv) {
   });
   if (badges.length > 0) artBadges = '<div style="margin:10px 0 4px; display:flex; flex-wrap:wrap; gap:6px;">' + badges.join('') + '</div>';
 
-  return `<div class="message" data-msg-idx="${idx}"><div class="message-header"><div class="message-avatar assistant">◇</div><span class="message-role">${getProviderName(msg.model||conv.model)}</span><span class="message-model">${getModelShort(msg.model||conv.model)}</span>${webBadge}</div>${thinkHtml}${searchHtml}<div class="message-content">${renderMarkdown(msg.content||'')}</div>${artBadges}<div class="message-actions"><button class="msg-action-btn" onclick="generateWordFromMessage(${idx})" title="Générer un document Word">📝 Word</button><button class="msg-action-btn" onclick="exportMessagePdf(${idx})" title="Exporter en PDF">📄 PDF</button><button class="msg-action-btn" onclick="copyMessageText(${idx})" title="Copier le texte"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="vertical-align:middle"><rect x="9" y="9" width="13" height="13" rx="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></svg> Copier</button></div></div>`;
+  return `<div class="message" data-msg-idx="${idx}"><div class="message-header"><div class="message-avatar assistant">◇</div><span class="message-role">${getProviderName(msg.model||conv.model)}</span><span class="message-model">${getModelShort(msg.model||conv.model)}</span>${webBadge}</div>${thinkHtml}${searchHtml}<div class="message-content" style="position:relative">${renderMarkdown(msg.content||'')}<button class="copy-float-btn" onclick="event.stopPropagation();copyMessageText(${idx})" title="Copier"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="9" y="9" width="13" height="13" rx="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></svg></button></div>${artBadges}<div class="message-actions"><button class="msg-action-btn" onclick="generateWordFromMessage(${idx})" title="Générer un document Word">📝 Word</button><button class="msg-action-btn" onclick="exportMessagePdf(${idx})" title="Exporter en PDF">📄 PDF</button><button class="msg-action-btn" onclick="copyMessageText(${idx})" title="Copier le texte"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="vertical-align:middle"><rect x="9" y="9" width="13" height="13" rx="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></svg> Copier</button></div></div>`;
 }
 // ═══════════════════════════════════════════════════════════════
 // LATEX → UNICODE CONVERTER (fallback when KaTeX fails)
