@@ -1317,7 +1317,7 @@ textarea.param-input { min-height: 70px; resize: vertical; font-size: 12px; line
           <span class="tok-out" title="Tokens sortie">↓ <b id="tokOut">0</b></span>
           <span class="tok-think" title="Tokens thinking" id="tokThinkWrap" style="display:none">💭 <b id="tokThink">0</b></span>
         </div>
-        <span id="syncIndicator" title="Synchronisation Gist" style="font-size:14px;cursor:pointer;display:none" onclick="toggleKeysMenu()"></span>
+        <span id="syncIndicator" title="Synchronisation Gist" style="font-size:14px;cursor:pointer" onclick="toggleKeysMenu()">☁</span>
         <button class="header-btn" id="paramsToggleBtn" onclick="toggleParamsPanel()">⚙ Paramètres</button>
         <button class="header-btn" id="contextToggleBtn" onclick="toggleContextPanel()">📋 Contexte</button>
         <div class="keys-dropdown-wrap">
@@ -5403,8 +5403,9 @@ function updateSyncIndicator(state) {
   if (!el) return;
   var inputEl = document.getElementById('githubTokenInput');
   var token = (inputEl && inputEl.value) ? inputEl.value.trim() : (localStorage.getItem('cs_github_token') || '');
-  if (!token) { el.style.display = 'none'; return; }
   el.style.display = 'inline';
+  if (!token) { el.textContent = '☁'; el.title = 'Sync non configurée — entrez un token GitHub dans 🔑'; el.style.color = 'var(--text-tertiary)'; el.style.opacity = '0.4'; return; }
+  el.style.opacity = '1';
   if (state === 'saving') { el.textContent = '↻'; el.title = 'Synchronisation en cours...'; el.style.color = 'var(--warning, orange)'; }
   else if (state === 'ok') { el.textContent = '☁✓'; el.title = 'Synchronisé'; el.style.color = 'var(--success, #5ab87a)'; }
   else if (state === 'error') { el.textContent = '☁✕'; el.title = 'Erreur de synchronisation'; el.style.color = 'var(--error, #d45a5a)'; }
