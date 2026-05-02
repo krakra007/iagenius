@@ -1224,7 +1224,8 @@ textarea.param-input { min-height: 70px; resize: vertical; font-size: 12px; line
               <option value="claude-opus-4-1">Opus 4.1</option>
             </optgroup>
             <optgroup label="── OpenAI GPT-5.5 ──">
-              <option value="gpt-5.5">GPT-5.5 (nouveau flagship)</option>
+              <option value="gpt-5.5">GPT-5.5 (flagship)</option>
+              <option value="gpt-5.5-pro">GPT-5.5 Pro (+ compute)</option>
             </optgroup>
             <optgroup label="── OpenAI GPT-5.4 ──">
               <option value="gpt-5.4">GPT-5.4 (flagship)</option>
@@ -1251,7 +1252,8 @@ textarea.param-input { min-height: 70px; resize: vertical; font-size: 12px; line
               <option value="o1">o1</option>
             </optgroup>
             <optgroup label="── OpenAI Image ──">
-              <option value="gpt-image-1">GPT Image 🎨</option>
+              <option value="gpt-image-2">GPT Image 2 🎨 (nouveau)</option>
+              <option value="gpt-image-1">GPT Image 1 🎨</option>
             </optgroup>
             <optgroup label="── DeepSeek V4 (Nouveau) ──">
               <option value="deepseek-v4-pro">DeepSeek V4 Pro (1.6T params)</option>
@@ -1285,24 +1287,27 @@ textarea.param-input { min-height: 70px; resize: vertical; font-size: 12px; line
               <option value="llama-3.1-8b-instant">Llama 3.1 8B — Groq</option>
               <option value="openai/gpt-oss-120b">GPT-OSS 120B — Groq</option>
               <option value="openai/gpt-oss-20b">GPT-OSS 20B — Groq</option>
+              <option value="qwen/qwen3-32b">Qwen3 32B — Groq</option>
+              <option value="moonshotai/kimi-k2-instruct-0905">Kimi K2 — Groq</option>
               <option value="meta-llama/llama-4-scout-17b-16e-instruct">Llama 4 Scout 17B — Groq (Preview)</option>
               <option value="open-mistral-nemo">Mistral Nemo 12B — Mistral</option>
             </optgroup>
             <optgroup label="── OpenRouter Gratuit ──">
               <option value="or:nvidia/nemotron-3-super-120b-a12b:free">Nemotron 3 Super 120B (free)</option>
+              <option value="or:openrouter/owl-alpha:free">Owl Alpha (free)</option>
               <option value="or:tencent/hy3-preview:free">Tencent Hy3 Preview (free)</option>
+              <option value="or:nvidia/nemotron-nano-2-vl:free">Nemotron Nano 2 VL (free)</option>
               <option value="or:inclusionai/ling-2.6-1t:free">Ling 2.6 1T (free)</option>
-              <option value="or:inclusionai/ling-2.6-flash:free">Ling 2.6 Flash (free)</option>
-              <option value="or:z-ai/glm-4.5-air:free">GLM 4.5 Air (free)</option>
-              <option value="or:minimax/minimax-m2.5:free">MiniMax M2.5 (free)</option>
               <option value="or:openai/gpt-oss-120b:free">GPT-OSS 120B (free)</option>
+              <option value="or:minimax/minimax-m2.5:free">MiniMax M2.5 (free)</option>
               <option value="or:nvidia/nemotron-3-nano-30b-a3b:free">Nemotron 3 Nano 30B (free)</option>
+              <option value="or:openrouter/pony:free">Pony (free)</option>
               <option value="or:openrouter/free">Auto — gratuit aléatoire</option>
             </optgroup>
             <optgroup label="── OpenRouter Payant ──">
               <option value="or:anthropic/claude-opus-4.7">Claude Opus 4.7 (OR)</option>
               <option value="or:anthropic/claude-sonnet-4.5">Claude Sonnet 4.5 (OR)</option>
-              <option value="or:anthropic/claude-opus-4.6">Claude Opus 4.6 (OR)</option>
+              <option value="or:openai/gpt-5.5">GPT-5.5 (OR)</option>
               <option value="or:openai/gpt-5.4">GPT-5.4 (OR)</option>
               <option value="or:google/gemini-2.5-pro-preview">Gemini 2.5 Pro (OR)</option>
               <option value="or:deepseek/deepseek-r1">DeepSeek R1 (OR)</option>
@@ -3216,12 +3221,12 @@ function getModelShort(m) {
     'claude-opus-4-7':'Opus 4.7', 'claude-opus-4-6':'Opus 4.6', 'claude-sonnet-4-6':'Son 4.6',
     'claude-sonnet-4-5-20250929':'Son 4.5', 'claude-haiku-4-5-20251001':'Haiku 4.5',
     'claude-opus-4-1':'Opus 4.1',
-    'gpt-5.5':'GPT-5.5', 'gpt-5.4':'GPT-5.4', 'gpt-5.4-mini':'5.4 mini', 'gpt-5.4-nano':'5.4 nano',
+    'gpt-5.5':'GPT-5.5', 'gpt-5.5-pro':'GPT-5.5 Pro', 'gpt-5.4':'GPT-5.4', 'gpt-5.4-mini':'5.4 mini', 'gpt-5.4-nano':'5.4 nano',
     'gpt-5':'GPT-5', 'gpt-5-mini':'5 mini', 'gpt-5-nano':'5 nano', 'gpt-5.2':'GPT-5.2',
     'gpt-4.1':'GPT-4.1', 'gpt-4.1-mini':'4.1 mini', 'gpt-4.1-nano':'4.1 nano',
     'gpt-4o':'GPT-4o', 'gpt-4o-mini':'4o-mini',
     'o1':'o1', 'o3':'o3', 'o3-mini':'o3-mini', 'o4-mini':'o4-mini',
-    'gpt-image-1':'GPT Image',
+    'gpt-image-1':'GPT Img 1', 'gpt-image-2':'GPT Img 2',
     'deepseek-v4-pro':'DS V4 Pro', 'deepseek-v4-flash':'DS V4 Flash',
     'deepseek-chat':'DS-Chat', 'deepseek-reasoner':'DS-Reason',
     'gemini-3.1-pro-preview':'G3.1 Pro', 'gemini-3-flash-preview':'G3 Flash',
@@ -3231,22 +3236,23 @@ function getModelShort(m) {
     'llama-3.3-70b-versatile':'Llama3.3 70B', 'llama-3.1-8b-instant':'Llama3.1 8B',
     'meta-llama/llama-4-scout-17b-16e-instruct':'Llama4 Scout',
     'qwen/qwen3-32b':'Qwen3 32B', 'openai/gpt-oss-120b':'GPT-OSS 120B', 'openai/gpt-oss-20b':'GPT-OSS 20B',
+    'moonshotai/kimi-k2-instruct-0905':'Kimi K2',
     'mistral-large-latest':'M-Large', 'mistral-medium-latest':'M-Medium',
     'mistral-small-latest':'M-Small', 'magistral-medium-latest':'Mag-Med',
     'magistral-small-latest':'Mag-Small', 'codestral-latest':'Codestral',
     'open-mistral-nemo':'M-Nemo',
     'or:nvidia/nemotron-3-super-120b-a12b:free':'Nemo3S free',
+    'or:openrouter/owl-alpha:free':'Owl free',
     'or:tencent/hy3-preview:free':'Hy3 free',
+    'or:nvidia/nemotron-nano-2-vl:free':'NemoVL free',
     'or:inclusionai/ling-2.6-1t:free':'Ling1T free',
-    'or:inclusionai/ling-2.6-flash:free':'LingF free',
-    'or:z-ai/glm-4.5-air:free':'GLM4.5 free',
     'or:openai/gpt-oss-120b:free':'GPT-OSS free',
     'or:nvidia/nemotron-3-nano-30b-a3b:free':'NemoNano free',
     'or:minimax/minimax-m2.5:free':'MiniMax free',
+    'or:openrouter/pony:free':'Pony free',
     'or:openrouter/free':'OR Auto',
-    'or:z-ai/glm-4.5-air:free':'GLM4.5 free',
-    'or:anthropic/claude-opus-4.7':'Opus 4.7 OR', 'or:anthropic/claude-sonnet-4.5':'Son 4.5 OR', 'or:anthropic/claude-opus-4.6':'Opus 4.6 OR',
-    'or:openai/gpt-5.4':'GPT-5.4 OR', 'or:google/gemini-2.5-pro-preview':'Gem2.5 OR',
+    'or:anthropic/claude-opus-4.7':'Opus 4.7 OR', 'or:anthropic/claude-sonnet-4.5':'Son 4.5 OR',
+    'or:openai/gpt-5.5':'GPT-5.5 OR', 'or:openai/gpt-5.4':'GPT-5.4 OR', 'or:google/gemini-2.5-pro-preview':'Gem2.5 OR',
     'or:deepseek/deepseek-r1':'DS R1 OR', 'or:x-ai/grok-3-mini':'Grok3m OR'
   }[m] || m.slice(0, 12);
 }
@@ -3616,10 +3622,10 @@ RÈGLES STRICTES :
 // ═══════════════════════════════════════════════════════════════
 // OPENAI ROUTING
 // ═══════════════════════════════════════════════════════════════
-const OPENAI_MODELS = new Set(['gpt-5.5','gpt-5.4','gpt-5.4-mini','gpt-5.4-nano','gpt-5','gpt-5-mini','gpt-5-nano','gpt-5.2','gpt-4.1','gpt-4.1-mini','gpt-4.1-nano','gpt-4o','gpt-4o-mini','o1','o3','o3-mini','o3-pro','o4-mini','gpt-image-1']);
+const OPENAI_MODELS = new Set(['gpt-5.5','gpt-5.5-pro','gpt-5.4','gpt-5.4-mini','gpt-5.4-nano','gpt-5','gpt-5-mini','gpt-5-nano','gpt-5.2','gpt-4.1','gpt-4.1-mini','gpt-4.1-nano','gpt-4o','gpt-4o-mini','o1','o3','o3-mini','o3-pro','o4-mini','gpt-image-1','gpt-image-2']);
 const DEEPSEEK_MODELS = new Set(['deepseek-v4-pro','deepseek-v4-flash','deepseek-chat','deepseek-reasoner']);
 const GEMINI_MODELS = new Set(['gemini-3.1-pro-preview','gemini-3-flash-preview','gemini-3.1-flash-lite-preview','gemini-3.1-flash-image-preview','gemini-2.5-pro','gemini-2.5-flash','gemini-2.5-flash-lite']);
-const GROQ_MODELS = new Set(['llama-3.3-70b-versatile','llama-3.1-8b-instant','meta-llama/llama-4-scout-17b-16e-instruct','openai/gpt-oss-120b','openai/gpt-oss-20b']);
+const GROQ_MODELS = new Set(['llama-3.3-70b-versatile','llama-3.1-8b-instant','meta-llama/llama-4-scout-17b-16e-instruct','openai/gpt-oss-120b','openai/gpt-oss-20b','qwen/qwen3-32b','moonshotai/kimi-k2-instruct-0905']);
 const MISTRAL_MODELS = new Set(['mistral-large-latest','mistral-medium-latest','mistral-small-latest','magistral-medium-latest','magistral-small-latest','codestral-latest','open-mistral-nemo']);
 function isOpenAIModel(model) { return OPENAI_MODELS.has(model); }
 function isDeepSeekModel(model) { return DEEPSEEK_MODELS.has(model); }
@@ -3827,7 +3833,7 @@ async function generateOpenAIImage(conv, apiKey, params, prompt) {
       method: 'POST',
       headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + apiKey },
       body: JSON.stringify({
-        model: 'gpt-image-1',
+        model: (params.model === 'gpt-image-1') ? 'gpt-image-1' : 'gpt-image-2',
         prompt: prompt,
         n: 1,
         size: '1024x1024',
@@ -4467,7 +4473,7 @@ async function _sendMessageCore() {
     } else if (usingOpenAI) {
       // Check if user wants an image — use Images API instead of Chat
       var lastUserMsg2 = [...conv.messages].reverse().find(function(m) { return m.role === 'user'; });
-      if (params.model === 'gpt-image-1' || (lastUserMsg2 && isImageRequest(lastUserMsg2.content))) {
+      if (params.model === 'gpt-image-1' || params.model === 'gpt-image-2' || (lastUserMsg2 && isImageRequest(lastUserMsg2.content))) {
         await generateOpenAIImage(conv, openaiKey, params, lastUserMsg2 ? lastUserMsg2.content : text);
       } else if (params.stream) { await streamOpenAIResponse(conv, openaiKey, params); }
       else await regularOpenAIResponse(conv, openaiKey, params);
