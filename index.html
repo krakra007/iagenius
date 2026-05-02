@@ -4455,6 +4455,31 @@ async function _sendMessageCore() {
   isStreaming = true; updateSendButton();
 
   try {
+    // ── Universal image detection: intercept "dessine/draw/..." for ALL providers ──
+    var lastUserMsgForImage = [...conv.messages].reverse().find(function(m) { return m.role === 'user'; });
+    var wantsImageUniversal = lastUserMsgForImage && isImageRequest(lastUserMsgForImage.content);
+    // If image requested and NOT already on an image-capable provider, redirect to OpenAI Images API
+    if (wantsImageUniversal && !usingGemini && !(usingOpenAI && (params.model === 'gpt-image-1' || params.model === 'gpt-image-2'))) {
+      var imgKey = openaiKey || document.getElementById('openaiKeyInput')?.value?.trim();
+      if (imgKey) {
+        showToast('🎨 Redirection vers OpenAI Images...', 'success');
+        await generateOpenAIImage(conv, imgKey, params, lastUserMsgForImage.content);
+      } else {
+        // No OpenAI key — try Gemini if available
+        var gKey = geminiKey || document.getElementById('geminiKeyInput')?.value?.trim();
+        if (gKey) {
+          showToast('🎨 Redirection vers Gemini Image...', 'success');
+          var imgParams = Object.assign({}, params, { model: 'gemini-3.1-flash-image-preview' });
+          await regularGeminiResponse(conv, gKey, imgParams);
+        } else {
+          showToast('⚠ Génération d\'image nécessite une clé OpenAI ou Gemini dans 🔑', 'error');
+          // Fall through to normal provider for text response
+          wantsImageUniversal = false;
+        }
+      }
+    } else { wantsImageUniversal = false; }
+
+    if (!wantsImageUniversal) {
     if (usingGemini) {
       if (params.stream) await streamGeminiResponse(conv, geminiKey, params);
       else await regularGeminiResponse(conv, geminiKey, params);
@@ -4481,6 +4506,7 @@ async function _sendMessageCore() {
       if (params.stream) await streamResponse(conv, apiKey, params);
       else await regularResponse(conv, apiKey, params);
     }
+    } // end if (!wantsImageUniversal)
   } catch (err) {
     removeTypingIndicator();
     if (err.name !== 'AbortError') {
