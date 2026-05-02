@@ -4434,7 +4434,9 @@ async function _sendMessageCore() {
   if (usingOpenRouter && !openrouterKey) { showToast('Entrez votre clé API OpenRouter dans le menu 🔑', 'error'); return; }
   if (!usingOpenAI && !usingDeepSeek && !usingGemini && !usingGroq && !usingMistral && !usingOpenRouter && !apiKey) { showToast('Entrez votre clé API Anthropic dans le menu 🔑', 'error'); return; }
   if (!currentConvId) newConversation();
-  const conv = getCurrentConversation();
+  let conv = getCurrentConversation();
+  if (!conv) { newConversation(); conv = getCurrentConversation(); }
+  if (!conv) { showToast('⚠ Impossible de créer une conversation', 'error'); return; }
   conv.model = params.model; conv.params = params;
   // Capture attachments
   const attachments = pendingAttachments.map(a => ({...a}));
