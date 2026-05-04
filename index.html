@@ -568,6 +568,18 @@
     }
   }
 
+
+  function ensureLandingBlankChat(){
+    const c = activeChat();
+    const isBlank = c && Array.isArray(c.messages) && c.messages.length === 0;
+    if(isBlank) return;
+
+    const newId = crypto.randomUUID();
+    S.chats.unshift({ id:newId, title:"Nouvelle recherche", projectId:null, messages:[] });
+    S.activeChat = newId;
+    S.activeProject = null;
+  }
+
   function updateLayoutMode(){
     const main = document.querySelector(".main");
     const c = activeChat();
@@ -820,6 +832,7 @@
   };
 
   ensureSidebarData();
+  ensureLandingBlankChat();
   save();
   renderApiKeys();
   renderModels();
