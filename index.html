@@ -537,7 +537,35 @@
     el("p_stop").onchange = e => { S.params.stop = e.target.value; save(); };
     el("p_seed").onchange = e => { S.params.seed = e.target.value; save(); };
     el("p_top_k").onchange = e => { S.params.top_k = e.target.value; save(); };
-    el("p_diag").onchange = e => { diagnosticMode = !!e.target.checked; save(); renderDiagnosticPanel(); };
+    const pDiag = el("p_diag");
+    if(pDiag){
+      pDiag.onchange = e => { diagnosticMode = !!e.target.checked; save(); renderDiagnosticPanel(); };
+    }
+  }
+
+  function ensureSidebarData(){
+    if(!Array.isArray(S.projects)) S.projects = [];
+    if(!Array.isArray(S.chats)) S.chats = [];
+
+    if(S.projects.length === 0){
+      const projectId = crypto.randomUUID();
+      S.projects = [{ id: projectId, name: "Projet 1" }];
+      S.activeProject = projectId;
+    }
+
+    if(!S.chats.some(c => c.projectId === S.projects[0].id)){
+      S.chats.unshift({ id: crypto.randomUUID(), title:"Chat du projet", projectId:S.projects[0].id, messages:[] });
+    }
+    if(!S.chats.some(c => !c.projectId)){
+      S.chats.unshift({ id: crypto.randomUUID(), title:"Conversation générale", projectId:null, messages:[] });
+    }
+
+    if(!S.activeChat || !S.chats.some(c => c.id === S.activeChat)){
+      S.activeChat = S.chats[0].id;
+    }
+    if(!S.activeProject || !S.projects.some(p => p.id === S.activeProject)){
+      S.activeProject = S.projects[0].id;
+    }
   }
 
   function updateLayoutMode(){
@@ -761,8 +789,8 @@
 
   el("sendBtn").onclick = send;
   const appEl = document.querySelector(".app");
-  const savedSidebarState = localStorage.getItem("sidebarCollapsed") === "1";
-  if(savedSidebarState) appEl.classList.add("sidebar-collapsed");
+  appEl.classList.remove("sidebar-collapsed");
+  localStorage.setItem("sidebarCollapsed", "0");
 
   el("toggleSidebarBtn").onclick = () => {
     appEl.classList.toggle("sidebar-collapsed");
@@ -791,7 +819,8 @@
     await loadModelsFromApi();
   };
 
-  if(!S.chats.length) createChat(null);
+  ensureSidebarData();
+  save();
   renderApiKeys();
   renderModels();
   renderParams();
